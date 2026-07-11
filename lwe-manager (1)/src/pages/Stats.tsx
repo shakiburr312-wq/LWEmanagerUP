@@ -138,8 +138,17 @@ export const Stats: React.FC = () => {
                 <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
                   {/* Left profile/badge */}
                   <div className="relative">
-                    <div className="w-24 h-24 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-500/5">
-                      <Crown className="w-12 h-12" />
+                    <div className="w-24 h-24 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-500/5 overflow-hidden">
+                      {mvp.photoUrl || mvp.mvpPhotoUrl ? (
+                        <img 
+                          src={mvp.photoUrl || mvp.mvpPhotoUrl} 
+                          alt={mvp.name} 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <Crown className="w-12 h-12" />
+                      )}
                     </div>
                     <div className="absolute -bottom-2 -right-2 bg-amber-500 text-[#050507] font-mono text-[9px] font-black uppercase px-2 py-0.5 rounded shadow">
                       MVP
