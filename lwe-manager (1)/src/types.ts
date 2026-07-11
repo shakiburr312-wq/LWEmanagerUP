@@ -41,11 +41,19 @@ export interface Lineup {
   logoUrl?: string;
 }
 
+export interface HeroBannerItem {
+  id: string;
+  imageUrl: string;
+  title: string;
+  linkUrl?: string;
+}
+
 export interface SiteSettings {
   heroTitle?: string;
   heroSubtitle?: string;
   heroImageUrl?: string;
   logoUrl?: string;
+  heroBanners?: HeroBannerItem[];
 }
 
 export interface SalaryTransaction {
