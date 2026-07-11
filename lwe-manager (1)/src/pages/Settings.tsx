@@ -10,7 +10,7 @@ import {
   saveLineupLogo 
 } from '../lib/settings';
 import { uploadImage } from '../lib/uploadImage';
-import { MVPSettings, SiteSettings, Lineup } from '../types';
+import { MVPSettings, SiteSettings, Lineup, HeroBannerItem } from '../types';
 import { Sidebar } from '../components/Sidebar';
 import { BalanceIndicator } from '../components/BalanceIndicator';
 import { 
@@ -24,7 +24,10 @@ import {
   Upload, 
   Image as ImageIcon, 
   Sparkles, 
-  Users 
+  Users,
+  Plus,
+  Trash2,
+  Link as LinkIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -41,7 +44,14 @@ export const SettingsPage: React.FC = () => {
   const [heroSubtitle, setHeroSubtitle] = useState('');
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [heroBanners, setHeroBanners] = useState<HeroBannerItem[]>([]);
   const [siteSaving, setSiteSaving] = useState(false);
+
+  // Form fields for adding/editing a banner
+  const [newBannerTitle, setNewBannerTitle] = useState('');
+  const [newBannerImageUrl, setNewBannerImageUrl] = useState('');
+  const [newBannerLinkUrl, setNewBannerLinkUrl] = useState('');
+  const [uploadingBannerImage, setUploadingBannerImage] = useState(false);
 
   // Lineups state
   const [lineups, setLineups] = useState<Lineup[]>([]);
@@ -59,6 +69,7 @@ export const SettingsPage: React.FC = () => {
       setHeroSubtitle(data.heroSubtitle || '');
       setHeroImageUrl(data.heroImageUrl || '');
       setLogoUrl(data.logoUrl || '');
+      setHeroBanners(data.heroBanners || []);
     });
 
     const unsubLineups = watchLineups((data) => {
@@ -110,7 +121,8 @@ export const SettingsPage: React.FC = () => {
         heroTitle: heroTitle.trim(),
         heroSubtitle: heroSubtitle.trim(),
         heroImageUrl: heroImageUrl.trim(),
-        logoUrl: logoUrl.trim()
+        logoUrl: logoUrl.trim(),
+        heroBanners
       });
       toast.success('Site branding configuration updated!', { id: toastId });
     } catch (err: any) {
@@ -120,13 +132,60 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleNewBannerImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isAdmin) return;
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setUploadingBannerImage(true);
+      const toastId = toast.loading('Uploading banner image directly to Cloudinary...');
+      try {
+        const url = await uploadImage(file, 'site/hero');
+        setNewBannerImageUrl(url);
+        toast.success('Banner image uploaded successfully!', { id: toastId });
+      } catch (err: any) {
+        toast.error('Upload failed: ' + err.message, { id: toastId });
+      } finally {
+        setUploadingBannerImage(false);
+      }
+    }
+  };
+
+  const handleAddBanner = () => {
+    if (!newBannerTitle.trim()) {
+      toast.error('Please enter a banner title');
+      return;
+    }
+    if (!newBannerImageUrl.trim()) {
+      toast.error('Please upload or enter a banner image URL');
+      return;
+    }
+
+    const newItem: HeroBannerItem = {
+      id: crypto.randomUUID(),
+      title: newBannerTitle.trim(),
+      imageUrl: newBannerImageUrl.trim(),
+      linkUrl: newBannerLinkUrl.trim() || undefined
+    };
+
+    setHeroBanners((prev) => [...prev, newItem]);
+    setNewBannerTitle('');
+    setNewBannerImageUrl('');
+    setNewBannerLinkUrl('');
+    toast.success('Banner added to list! Click "Commit Branding Settings" to save.');
+  };
+
+  const handleDeleteBanner = (id: string) => {
+    setHeroBanners((prev) => prev.filter((b) => b.id !== id));
+    toast.success('Banner removed from list! Click "Commit Branding Settings" to save.');
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isAdmin) return;
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const toastId = toast.loading('Uploading Site Logo directly to Cloudinary...');
       try {
-        const url = await uploadImage(file);
+        const url = await uploadImage(file, 'site');
         setLogoUrl(url);
         toast.success('Site Logo uploaded successfully!', { id: toastId });
       } catch (err: any) {
@@ -141,7 +200,7 @@ export const SettingsPage: React.FC = () => {
       const file = e.target.files[0];
       const toastId = toast.loading('Uploading Hero Banner image to Cloudinary...');
       try {
-        const url = await uploadImage(file);
+        const url = await uploadImage(file, 'site/hero');
         setHeroImageUrl(url);
         toast.success('Hero Banner image uploaded!', { id: toastId });
       } catch (err: any) {
@@ -161,7 +220,7 @@ export const SettingsPage: React.FC = () => {
   const handleLineupLogoUpload = async (lineupId: string, lineupName: string, file: File) => {
     const toastId = toast.loading(`Uploading team logo for ${lineupName}...`);
     try {
-      const url = await uploadImage(file);
+      const url = await uploadImage(file, 'lineups');
       await saveLineupLogo(lineupId, lineupName, url);
       toast.success(`${lineupName} logo updated successfully!`, { id: toastId });
     } catch (err: any) {
@@ -309,77 +368,223 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Hero Title */}
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono">
-                  Hero Title Text
-                </label>
-                <input
-                  type="text"
-                  value={heroTitle}
-                  onChange={(e) => setHeroTitle(e.target.value)}
-                  placeholder="LWE ESPORTS COMMAND CENTER"
-                  className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none transition-colors font-sans"
-                />
-              </div>
-
-              {/* Hero Subtitle */}
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono">
-                  Hero Subtitle Description
-                </label>
-                <textarea
-                  value={heroSubtitle}
-                  onChange={(e) => setHeroSubtitle(e.target.value)}
-                  placeholder="Real-time statistics, automated monthly rosters, and financial operations tracking"
-                  rows={2}
-                  className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none transition-colors font-sans resize-none"
-                />
-              </div>
-
-              {/* Hero Banner Upload / URL Config */}
-              <div className="space-y-3 bg-[#050507]/40 border border-white/5 rounded-2xl p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              {/* --- Multiple Carousel Slides Section --- */}
+              <div className="border border-purple-500/20 bg-purple-950/5 rounded-2xl p-4.5 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
                   <div className="space-y-0.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-gray-300 block">Hero Banner Image</span>
-                    <p className="text-[10px] text-gray-500">Provide URL OR upload direct file</p>
+                    <span className="text-xs font-bold uppercase tracking-wider text-purple-400 block font-mono">
+                      Carousel Hero Banners
+                    </span>
+                    <p className="text-[10px] text-gray-500">
+                      Add multiple banners to enable the swipeable/automatic slider on the dashboard
+                    </p>
                   </div>
-                  
-                  {/* Direct File Browse Button */}
-                  <label className="py-2 px-3.5 bg-[#050507] hover:bg-purple-950/20 border border-purple-500/20 text-purple-400 text-[10px] font-bold uppercase rounded-lg transition-colors cursor-pointer text-center font-mono flex items-center gap-1.5 self-start sm:self-center">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Image</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleHeroBannerUpload}
-                      className="hidden"
-                    />
-                  </label>
+                  <span className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/25 rounded text-[9px] font-mono font-bold text-purple-300">
+                    {heroBanners.length} SLIDES
+                  </span>
                 </div>
 
-                {/* URL Input Box */}
-                <div className="space-y-1.5">
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-purple-500 font-mono text-xs">
-                      URL:
-                    </span>
+                {/* Slides List */}
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {heroBanners.length > 0 ? (
+                    heroBanners.map((slide, index) => (
+                      <div 
+                        key={slide.id || index} 
+                        className="flex items-center justify-between gap-3 bg-[#050507] border border-white/5 hover:border-white/10 rounded-xl p-2.5 transition-all"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Thumbnail */}
+                          <div className="w-12 h-12 rounded-lg overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
+                            <img 
+                              src={slide.imageUrl} 
+                              alt={slide.title} 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          
+                          {/* Details */}
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-white truncate uppercase font-display">
+                              {slide.title}
+                            </h4>
+                            {slide.linkUrl && (
+                              <p className="text-[10px] text-purple-400 truncate flex items-center gap-1 font-mono">
+                                <LinkIcon className="w-2.5 h-2.5" />
+                                {slide.linkUrl}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBanner(slide.id)}
+                          className="p-2 bg-red-500/10 hover:bg-red-500/25 text-red-400 hover:text-red-300 rounded-lg border border-red-500/15 transition-all focus:outline-none flex-shrink-0"
+                          title="Remove Banner"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-6 text-center border border-dashed border-white/5 rounded-xl bg-[#050507]/25">
+                      <ImageIcon className="w-6 h-6 text-gray-600 mx-auto mb-1.5" />
+                      <p className="text-xs font-medium text-gray-500">No carousel slides added yet</p>
+                      <p className="text-[10px] text-gray-600 mt-0.5">Falls back to the default fallback banner below</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Add New Slide Subform */}
+                <div className="bg-[#050507]/60 border border-white/5 rounded-xl p-3.5 space-y-3">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-purple-400 font-mono block border-b border-white/5 pb-1.5">
+                    Add Slide Banner
+                  </span>
+
+                  {/* Title */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-bold text-gray-500 font-mono">
+                      Banner Title Text
+                    </label>
                     <input
                       type="text"
-                      value={heroImageUrl}
-                      onChange={(e) => setHeroImageUrl(e.target.value)}
-                      placeholder="Paste banner image URL here (Optional fallback)"
-                      className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2.5 pl-12 pr-4 text-xs text-white focus:outline-none transition-colors font-mono"
+                      value={newBannerTitle}
+                      onChange={(e) => setNewBannerTitle(e.target.value)}
+                      placeholder="e.g., WELCOME TO LUMINOUS WINGS"
+                      className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-lg py-2 px-3 text-xs text-white focus:outline-none transition-colors font-sans"
                     />
                   </div>
+
+                  {/* Image Upload and Link */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[9px] uppercase font-bold text-gray-500 font-mono">
+                        Banner Image URL / Upload
+                      </label>
+                      <label className="py-1 px-2.5 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/25 text-purple-300 text-[9px] font-bold uppercase rounded cursor-pointer transition-colors font-mono flex items-center gap-1">
+                        <Upload className="w-3 h-3" />
+                        <span>{uploadingBannerImage ? 'UPLOADING...' : 'UPLOAD FILE'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleNewBannerImageUpload}
+                          disabled={uploadingBannerImage}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={newBannerImageUrl}
+                      onChange={(e) => setNewBannerImageUrl(e.target.value)}
+                      placeholder="Paste Image URL here or use Upload button"
+                      className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-lg py-2 px-3 text-xs text-white focus:outline-none transition-colors font-mono"
+                    />
+                  </div>
+
+                  {/* Optional Action link (YT, FB, etc.) */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-bold text-gray-500 font-mono flex items-center gap-1">
+                      <span>Action Redirect Link (Optional)</span>
+                      <span className="text-purple-400 text-[8px] font-normal lowercase">(youtube/facebook/etc.)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newBannerLinkUrl}
+                      onChange={(e) => setNewBannerLinkUrl(e.target.value)}
+                      placeholder="e.g., https://www.youtube.com/watch?v=..."
+                      className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-lg py-2 px-3 text-xs text-white focus:outline-none transition-colors font-mono"
+                    />
+                  </div>
+
+                  {/* Add slide button */}
+                  <button
+                    type="button"
+                    onClick={handleAddBanner}
+                    disabled={uploadingBannerImage}
+                    className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/35 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 focus:outline-none"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>ADD SLIDE TO LIST</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* --- Fallback Single Banner Settings --- */}
+              <div className="border border-white/5 bg-white/[0.01] rounded-2xl p-4.5 space-y-4">
+                <div className="border-b border-white/5 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block font-mono">
+                    Fallback Single Banner Settings
+                  </span>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Used only when no carousel slides are configured above
+                  </p>
                 </div>
 
-                {/* Image preview */}
-                {heroImageUrl && (
-                  <div className="w-full h-24 rounded-xl border border-white/5 overflow-hidden bg-[#0a0a0f] relative mt-2">
-                    <img src={heroImageUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+                {/* Hero Title */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono">
+                    Default Hero Title
+                  </label>
+                  <input
+                    type="text"
+                    value={heroTitle}
+                    onChange={(e) => setHeroTitle(e.target.value)}
+                    placeholder="LWE ESPORTS COMMAND CENTER"
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none transition-colors font-sans"
+                  />
+                </div>
+
+                {/* Hero Subtitle */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono">
+                    Default Hero Subtitle
+                  </label>
+                  <textarea
+                    value={heroSubtitle}
+                    onChange={(e) => setHeroSubtitle(e.target.value)}
+                    placeholder="Real-time statistics, automated monthly rosters, and financial operations tracking"
+                    rows={2}
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2.5 px-4 text-sm text-white focus:outline-none transition-colors font-sans resize-none"
+                  />
+                </div>
+
+                {/* Hero Banner Upload / URL Config */}
+                <div className="space-y-3 bg-[#050507]/40 border border-white/5 rounded-xl p-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block font-mono">Fallback Banner Image</span>
+                    </div>
+                    
+                    <label className="py-1 px-2.5 bg-[#050507] hover:bg-purple-950/20 border border-purple-500/20 text-purple-400 text-[10px] font-bold uppercase rounded cursor-pointer transition-colors font-mono flex items-center gap-1">
+                      <Upload className="w-3 h-3" />
+                      <span>Upload Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleHeroBannerUpload}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
-                )}
+
+                  <input
+                    type="text"
+                    value={heroImageUrl}
+                    onChange={(e) => setHeroImageUrl(e.target.value)}
+                    placeholder="Paste fallback image URL here"
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2 px-3 text-xs text-white focus:outline-none transition-colors font-mono"
+                  />
+
+                  {heroImageUrl && (
+                    <div className="w-full h-20 rounded-lg border border-white/5 overflow-hidden bg-[#0a0a0f] relative mt-1">
+                      <img src={heroImageUrl} alt="Fallback Banner Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Submit branding */}
