@@ -92,7 +92,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
       });
 
       // 4. Update players collection only if they have a real roster player profile in Firestore
-      if (playerProfile && playerProfile.id && !playerProfile.id.startsWith('player_local_') && !['p1', 'p2', 'p3', 'p4'].includes(playerProfile.id)) {
+      if (playerProfile && playerProfile.id) {
         await updatePlayer(playerProfile.id, {
           name: name.trim(),
           photoUrl: finalPhotoUrl,
