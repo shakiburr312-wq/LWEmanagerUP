@@ -91,17 +91,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onCl
         name: name.trim()
       });
 
-      // 4. Update players collection
-      // Check if playerProfile exists in Firestore, otherwise it might be empty
-      if (playerProfile && playerProfile.id) {
+      // 4. Update players collection only if they have a real roster player profile in Firestore
+      if (playerProfile && playerProfile.id && !playerProfile.id.startsWith('player_local_') && !['p1', 'p2', 'p3', 'p4'].includes(playerProfile.id)) {
         await updatePlayer(playerProfile.id, {
-          name: name.trim(),
-          photoUrl: finalPhotoUrl,
-          mvpPhotoUrl: finalMvpPhotoUrl
-        });
-      } else {
-        // If profile doesn't exist, try to update 'players' collection with current UID
-        await updatePlayer(user.uid, {
           name: name.trim(),
           photoUrl: finalPhotoUrl,
           mvpPhotoUrl: finalMvpPhotoUrl
