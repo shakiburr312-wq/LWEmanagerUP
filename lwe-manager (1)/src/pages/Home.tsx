@@ -123,6 +123,20 @@ export const Home: React.FC = () => {
   const seasonRankedPlayers = getSeasonRankedPlayers(players, performanceLogs, mvpSettings);
   const seasonMvp = seasonRankedPlayers.length > 0 ? seasonRankedPlayers[0] : null;
 
+  const checkIsOnline = (member: PlayerProfile) => {
+    if (member.isOnline) return true;
+    if (!member.lastActive) return false;
+    try {
+      const lastActive = new Date(member.lastActive);
+      const now = new Date();
+      const diffMs = now.getTime() - lastActive.getTime();
+      // Within 1 minute (60,000 ms)
+      return diffMs >= 0 && diffMs < 60000;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const formatLastSeen = (lastActiveStr?: string) => {
     if (!lastActiveStr) return 'offline';
     try {
@@ -132,7 +146,7 @@ export const Home: React.FC = () => {
       if (diffMs < 0) return 'offline';
       
       const diffMins = Math.floor(diffMs / (1000 * 60));
-      if (diffMins < 1) return 'offline (just now)';
+      if (diffMins < 1) return 'offline'; // within 1 minute they are rendered as online
       if (diffMins < 60) return `offline (${diffMins}m ago)`;
       
       const diffHours = Math.floor(diffMins / 60);
@@ -349,40 +363,42 @@ export const Home: React.FC = () => {
 
                           return (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {teamMembers.map(member => (
-                                <div key={member.id} className="bg-[#050507]/60 border border-white/5 hover:border-purple-500/20 rounded-2xl p-4 flex items-center space-x-3 transition-all relative">
-                                  {/* Online status indicator on division roster */}
-                                  <span className={`absolute top-3 right-3 w-2.5 h-2.5 rounded-full border border-[#050507] ${
-                                    member.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-600'
-                                  }`} title={member.isOnline ? 'Online' : 'Offline'} />
+                              {teamMembers.map(member => {
+                                const online = checkIsOnline(member);
+                                return (
+                                  <div key={member.id} className="bg-[#050507]/60 border border-white/5 hover:border-purple-500/20 rounded-2xl p-4 flex items-center space-x-3 transition-all relative">
+                                    {/* Online status indicator on division roster */}
+                                    <span className={`absolute top-3 right-3 w-2.5 h-2.5 rounded-full border border-[#050507] ${
+                                      online ? 'bg-emerald-500 animate-pulse' : 'bg-gray-600'
+                                    }`} title={online ? 'Online' : 'Offline'} />
 
-                                  <div className="relative flex-shrink-0">
-                                    <div className="w-10 h-10 rounded-full border border-purple-500/10 bg-purple-950/20 overflow-hidden flex items-center justify-center font-bold text-purple-400 font-mono text-sm uppercase">
-                                      {member.photoUrl ? (
-                                        <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" />
-                                      ) : (
-                                        member.name.substring(0, 2)
-                                      )}
+                                    <div className="relative flex-shrink-0">
+                                      <div className="w-10 h-10 rounded-full border border-purple-500/10 bg-purple-950/20 overflow-hidden flex items-center justify-center font-bold text-purple-400 font-mono text-sm uppercase">
+                                        {member.photoUrl ? (
+                                          <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                          member.name.substring(0, 2)
+                                        )}
+                                      </div>
+                                      {/* lineup badge */}
+                                      {(() => {
+                                        const mLineup = lineups.find(l => l.id === member.lineupId || l.name === member.lineup);
+                                        if (!mLineup?.logoUrl) return null;
+                                        return (
+                                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#050507] border border-purple-500/30 rounded-full overflow-hidden flex items-center justify-center p-0.5">
+                                            <img src={mLineup.logoUrl} alt="lineup logo" className="w-full h-full object-contain" />
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
-                                    {/* lineup badge */}
-                                    {(() => {
-                                      const mLineup = lineups.find(l => l.id === member.lineupId || l.name === member.lineup);
-                                      if (!mLineup?.logoUrl) return null;
-                                      return (
-                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#050507] border border-purple-500/30 rounded-full overflow-hidden flex items-center justify-center p-0.5">
-                                          <img src={mLineup.logoUrl} alt="lineup logo" className="w-full h-full object-contain" />
-                                        </div>
-                                      );
-                                    })()}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className="text-xs font-bold text-white truncate uppercase tracking-wider">{member.name}</h4>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-[9px] text-gray-500 block uppercase font-mono">{member.role}</span>
-                                      <span className={`text-[8px] font-mono uppercase ${member.isOnline ? 'text-emerald-400 font-bold' : 'text-gray-400'}`}>
-                                        {member.isOnline ? 'online' : formatLastSeen(member.lastActive)}
-                                      </span>
-                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h4 className="text-xs font-bold text-white truncate uppercase tracking-wider">{member.name}</h4>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[9px] text-gray-500 block uppercase font-mono">{member.role}</span>
+                                        <span className={`text-[8px] font-mono uppercase ${online ? 'text-emerald-400 font-bold' : 'text-gray-400'}`}>
+                                          {online ? 'online' : formatLastSeen(member.lastActive)}
+                                        </span>
+                                      </div>
                                     <div className="flex items-center space-x-2 mt-1 text-[9px] font-mono text-purple-400">
                                       <span>KD: <strong>{((member.matches && member.matches > 0) ? ((member.kills || 0) / Math.max(1, member.matches - (member.booyahs || 0))) : (member.kd || 0)).toFixed(2)}</strong></span>
                                       <span className="text-gray-700">|</span>
@@ -390,7 +406,8 @@ export const Home: React.FC = () => {
                                     </div>
                                   </div>
                                 </div>
-                              ))}
+                              );
+                            })}
                             </div>
                           );
                         })()}
