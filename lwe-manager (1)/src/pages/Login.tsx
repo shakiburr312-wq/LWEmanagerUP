@@ -31,7 +31,7 @@ export const Login: React.FC = () => {
   // If already logged in, redirect
   useEffect(() => {
     if (firebaseUser) {
-      navigate('/players');
+      navigate('/home');
     }
   }, [firebaseUser, navigate]);
 
