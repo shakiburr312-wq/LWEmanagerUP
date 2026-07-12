@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Players } from './pages/Players';
+import { Home } from './pages/Home';
 import { Approvals } from './pages/Approvals';
 import { Complaints } from './pages/Complaints';
 import { SettingsPage } from './pages/Settings';
@@ -22,6 +23,14 @@ export default function App() {
           <Route path="/login" element={<Login />} />
 
           {/* Core App Protected Routes */}
+          <Route 
+            path="/home" 
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/players" 
             element={
@@ -82,7 +91,7 @@ export default function App() {
           />
 
           {/* Fallback route */}
-          <Route path="*" element={<Navigate to="/players" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </BrowserRouter>
       
