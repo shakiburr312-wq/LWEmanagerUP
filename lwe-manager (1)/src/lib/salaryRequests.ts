@@ -143,12 +143,12 @@ export async function approveSalaryRequest(
     await updatePlayerWallet(playerId, amount);
 
     // 3. Log into financeTransactions central log
+    // Do not pass adminId here to avoid double deduction since we already deducted above
     await addFinanceTransaction(
       'salary_payment',
       amount,
       `Salary Request Approved for ${playerName} via ${paymentMethod} (${requestId})`,
-      adminName,
-      adminId
+      adminName
     );
 
     // 4. Log into salaryTransactions
