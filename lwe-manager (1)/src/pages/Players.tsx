@@ -242,17 +242,6 @@ export const Players: React.FC = () => {
     }
   };
 
-  // Filter and search
-  const filteredPlayers = players.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'All' || p.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
-
-  // Season MVP Calculations
-  const seasonRankedPlayers = getSeasonRankedPlayers(players, performanceLogs, mvpSettings);
-  const seasonMvp = seasonRankedPlayers.length > 0 ? seasonRankedPlayers[0] : null;
-
   const checkIsOnline = (p: PlayerProfile) => {
     if (p.isOnline) return true;
     if (!p.lastActive) return false;
@@ -288,6 +277,25 @@ export const Players: React.FC = () => {
       return 'offline';
     }
   };
+
+  // Filter, search and sort by online status (online prioritized first)
+  const filteredPlayers = players
+    .filter((p) => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole = roleFilter === 'All' || p.role === roleFilter;
+      return matchesSearch && matchesRole;
+    })
+    .sort((a, b) => {
+      const aOnline = checkIsOnline(a);
+      const bOnline = checkIsOnline(b);
+      if (aOnline && !bOnline) return -1;
+      if (!aOnline && bOnline) return 1;
+      return 0;
+    });
+
+  // Season MVP Calculations
+  const seasonRankedPlayers = getSeasonRankedPlayers(players, performanceLogs, mvpSettings);
+  const seasonMvp = seasonRankedPlayers.length > 0 ? seasonRankedPlayers[0] : null;
 
   const handleSendChatMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
