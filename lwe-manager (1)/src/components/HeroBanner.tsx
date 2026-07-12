@@ -1,4 +1,3 @@
-//Herobanner
 import React, { useState, useEffect } from 'react';
 import { watchSiteSettings } from '../lib/settings';
 import { SiteSettings, HeroBannerItem } from '../types';
@@ -13,9 +12,18 @@ export const HeroBanner: React.FC = () => {
   useEffect(() => {
     const unsub = watchSiteSettings((data) => {
       setSiteSettings(data);
-      // Reset active index with a sliding back transition when settings/banners list updates
-      setDirection(-1);
-      setActiveIndex(0);
+      
+      // Prevent out-of-bounds index and avoid resetting activeIndex to 0 on every Firestore update
+      const nextBanners = data.heroBanners || [];
+      const fallbackBannersCount = (data.heroImageUrl || data.heroTitle) ? 1 : 1;
+      const count = nextBanners.length > 0 ? nextBanners.length : fallbackBannersCount;
+      
+      setActiveIndex((prev) => {
+        if (prev >= count) {
+          return 0;
+        }
+        return prev;
+      });
     });
     return () => unsub();
   }, []);
@@ -54,19 +62,22 @@ export const HeroBanner: React.FC = () => {
     setActiveIndex((prev) => (prev + 1) % banners.length);
   };
 
-  const slideVariants = {
-    enter: (dir: number) => ({
-      x: dir > 0 ? '100%' : dir < 0 ? '-100%' : '0%',
+  const fadeVariants = {
+    enter: {
       opacity: 0,
-    }),
-    center: {
-      x: '0%',
-      opacity: 1,
+      scale: 1.04,
+      filter: 'blur(8px)',
     },
-    exit: (dir: number) => ({
-      x: dir < 0 ? '100%' : dir > 0 ? '-100%' : '0%',
+    center: {
+      opacity: 1,
+      scale: 1,
+      filter: 'blur(0px)',
+    },
+    exit: {
       opacity: 0,
-    }),
+      scale: 0.96,
+      filter: 'blur(8px)',
+    },
   };
 
   const getLinkIcon = (url?: string) => {
@@ -101,18 +112,17 @@ export const HeroBanner: React.FC = () => {
 
   const contentElement = (
     <div className="absolute inset-0 overflow-hidden">
-      <AnimatePresence mode="wait" custom={direction} initial={false}>
+      <AnimatePresence mode="wait" initial={false}>
         {currentBanner.imageUrl ? (
           <motion.div
             key={currentBanner.id || activeIndex}
-            custom={direction}
-            variants={slideVariants}
+            variants={fadeVariants}
             initial="enter"
             animate="center"
             exit="exit"
             transition={{
-              x: { type: 'spring', stiffness: 220, damping: 26 },
-              opacity: { duration: 0.4 }
+              duration: 0.8,
+              ease: [0.22, 1, 0.36, 1] // Out-expo custom curve for cinematic smoothness
             }}
             className="absolute inset-0 w-full h-full"
           >
