@@ -172,31 +172,19 @@ export async function addSalaryPayment(
   reason: string, 
   addedBy: string,
   paymentMethod: 'bKash' | 'Nagad',
-  adminId?: string
+  adminId?: string,
+  payoutMode: 'direct' | 'wallet_withdraw' | 'wallet_credit' = 'direct'
 ) {
-  // Update local storage first
-  const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (local) {
-    const list: PlayerProfile[] = JSON.parse(local);
-    const index = list.findIndex(p => p.id === playerId);
-    if (index !== -1) {
-      list[index] = {
-        ...list[index],
-        wallet: (list[index].wallet || 0) + amount
-      };
-      // If adminId is provided, also deduct locally
-      if (adminId) {
-        const adminIndex = list.findIndex(p => p.id === adminId);
-        if (adminIndex !== -1) {
-          list[adminIndex] = {
-            ...list[adminIndex],
-            wallet: (list[adminIndex].wallet || 0) - amount
-          };
-        }
-      }
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
-      notifyPlayerWatchers(list);
-    }
+  // 1. Update player's wallet balance locally and in Firestore depending on payoutMode
+  if (payoutMode === 'wallet_withdraw') {
+    await updatePlayerWallet(playerId, -amount);
+  } else if (payoutMode === 'wallet_credit') {
+    await updatePlayerWallet(playerId, amount);
+  }
+
+  // 2. Update Admin's Wallet (main balance) locally and in Firestore if adminId is provided
+  if (adminId) {
+    await updatePlayerWallet(adminId, -amount);
   }
 
   // Record mock transactions locally as well to remain responsive
@@ -207,7 +195,7 @@ export async function addSalaryPayment(
       id: 'fin_local_' + Math.random().toString(36).substr(2, 9),
       type: 'salary_payment',
       amount,
-      description: `Salary Paid to ${playerName} via ${paymentMethod} (${reason})`,
+      description: `Salary Paid to ${playerName} via ${paymentMethod} (${reason} - ${payoutMode === 'wallet_withdraw' ? 'Wallet Withdrawal' : payoutMode === 'wallet_credit' ? 'Wallet Credit' : 'Direct Payout'})`,
       addedBy,
       date: new Date().toISOString()
     });
@@ -217,27 +205,15 @@ export async function addSalaryPayment(
   }
 
   try {
-    const playerRef = doc(db, 'players', playerId);
     const salaryTransRef = collection(db, 'salaryTransactions');
     const financeTransRef = collection(db, 'financeTransactions');
     const date = new Date().toISOString();
-
-    await setDoc(playerRef, {
-      wallet: increment(amount)
-    }, { merge: true });
-
-    if (adminId) {
-      const adminRef = doc(db, 'players', adminId);
-      await setDoc(adminRef, {
-        wallet: increment(-amount)
-      }, { merge: true });
-    }
 
     await addDoc(salaryTransRef, {
       playerId,
       playerName,
       amount,
-      reason,
+      reason: `${reason} (${payoutMode === 'wallet_withdraw' ? 'Wallet Withdrawal' : payoutMode === 'wallet_credit' ? 'Wallet Credit' : 'Direct Payout'})`,
       addedBy,
       paymentMethod,
       date
@@ -246,12 +222,12 @@ export async function addSalaryPayment(
     await addDoc(financeTransRef, {
       type: 'salary_payment',
       amount,
-      description: `Salary Paid to ${playerName} via ${paymentMethod} (${reason})`,
+      description: `Salary Paid to ${playerName} via ${paymentMethod} (${reason} - ${payoutMode === 'wallet_withdraw' ? 'Wallet Withdrawal' : payoutMode === 'wallet_credit' ? 'Wallet Credit' : 'Direct Payout'})`,
       addedBy,
       date
     });
   } catch (error) {
-    console.warn("Firestore addSalaryPayment failed, updated locally only:", error);
+    console.warn("Firestore addSalaryPayment logging failed:", error);
   }
 }
 
