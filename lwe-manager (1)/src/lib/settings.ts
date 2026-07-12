@@ -132,7 +132,9 @@ export function watchSiteSettings(callback: (settings: SiteSettings) => void) {
 export async function saveSiteSettings(settings: SiteSettings) {
   try {
     const docRef = doc(db, 'settings', 'site');
-    await setDoc(docRef, settings, { merge: true });
+    // Sanitize settings to remove undefined values before saving to Firestore
+    const sanitized = JSON.parse(JSON.stringify(settings)) as SiteSettings;
+    await setDoc(docRef, sanitized, { merge: true });
   } catch (error) {
     console.error("Firestore saveSiteSettings failed:", error);
     throw error;
