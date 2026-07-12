@@ -211,13 +211,20 @@ export const SettingsPage: React.FC = () => {
     if (!isAdmin) return;
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const toastId = toast.loading('Uploading Site Logo directly to Cloudinary...');
+      const toastId = toast.loading('Uploading and auto-saving Site Logo...');
       try {
         const url = await uploadImage(file, 'site');
         setLogoUrl(url);
-        toast.success('Site Logo uploaded successfully!', { id: toastId });
+        await saveSiteSettings({
+          heroTitle: heroTitle.trim(),
+          heroSubtitle: heroSubtitle.trim(),
+          heroImageUrl: heroImageUrl.trim(),
+          logoUrl: url,
+          heroBanners
+        });
+        toast.success('Site Logo uploaded and saved successfully!', { id: toastId });
       } catch (err: any) {
-        toast.error('Upload failed: ' + err.message, { id: toastId });
+        toast.error('Upload or save failed: ' + err.message, { id: toastId });
       }
     }
   };
@@ -226,13 +233,20 @@ export const SettingsPage: React.FC = () => {
     if (!isAdmin) return;
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const toastId = toast.loading('Uploading Hero Banner image to Cloudinary...');
+      const toastId = toast.loading('Uploading and auto-saving Hero Banner...');
       try {
         const url = await uploadImage(file, 'site/hero');
         setHeroImageUrl(url);
-        toast.success('Hero Banner image uploaded!', { id: toastId });
+        await saveSiteSettings({
+          heroTitle: heroTitle.trim(),
+          heroSubtitle: heroSubtitle.trim(),
+          heroImageUrl: url,
+          logoUrl: logoUrl.trim(),
+          heroBanners
+        });
+        toast.success('Hero Banner image uploaded and saved successfully!', { id: toastId });
       } catch (err: any) {
-        toast.error('Upload failed: ' + err.message, { id: toastId });
+        toast.error('Upload or save failed: ' + err.message, { id: toastId });
       }
     }
   };
