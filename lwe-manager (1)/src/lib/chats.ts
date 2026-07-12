@@ -41,9 +41,8 @@ export function watchLineupChats(
 
   const q = query(
     collection(db, CHATS_COLLECTION),
-    where('lineup', '==', lineup),
     orderBy('timestamp', 'desc'),
-    limit(50)
+    limit(150)
   );
 
   const unsub = onSnapshot(
@@ -52,18 +51,20 @@ export function watchLineupChats(
       const messages: ChatMessage[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
-        messages.push({
-          id: doc.id,
-          lineup: data.lineup || lineup,
-          senderId: data.senderId || '',
-          senderName: data.senderName || '',
-          senderRole: data.senderRole || '',
-          senderPhotoUrl: data.senderPhotoUrl || '',
-          message: data.message || '',
-          timestamp: data.timestamp || ''
-        });
+        if (data.lineup === lineup) {
+          messages.push({
+            id: doc.id,
+            lineup: data.lineup || lineup,
+            senderId: data.senderId || '',
+            senderName: data.senderName || '',
+            senderRole: data.senderRole || '',
+            senderPhotoUrl: data.senderPhotoUrl || '',
+            message: data.message || '',
+            timestamp: data.timestamp || ''
+          });
+        }
       });
-      // Sort ascending for chronological view
+      // Sort ascending for chronological view (the query fetched desc, we reverse it)
       messages.reverse();
       
       localStorage.setItem(localKey, JSON.stringify(messages));
