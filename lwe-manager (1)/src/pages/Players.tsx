@@ -2,12 +2,13 @@
 // Replacement of /src/pages/Players.tsx - Roster dashboard updated to calculate and showcase Season MVP dynamically
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { watchPlayers, updatePlayer, addSalaryPayment, issueWarning, setBanStatus } from '../lib/players';
+import { watchPlayers, updatePlayer, addSalaryPayment, issueWarning, setBanStatus, watchSalaryTransactions } from '../lib/players';
 import { watchInvestmentCampaigns } from '../lib/investments';
 import { watchSalaryRequests } from '../lib/salaryRequests';
 import { watchPerformanceLogs } from '../lib/performanceLogs';
 import { watchMVPSettings, checkAndResetSeason, watchLineups } from '../lib/settings';
-import { PlayerProfile, InvestmentCampaign, SalaryRequest, PerformanceLog, MVPSettings, Lineup } from '../types';
+import { watchLineupChats, sendLineupChatMessage } from '../lib/chats';
+import { PlayerProfile, InvestmentCampaign, SalaryRequest, PerformanceLog, MVPSettings, Lineup, SalaryTransaction, ChatMessage } from '../types';
 import { getSeasonRankedPlayers } from '../utils/mvp';
 import { PlayerModal } from '../components/PlayerModal';
 import { SalaryModal } from '../components/SalaryModal';
@@ -32,7 +33,10 @@ import {
   AlertOctagon,
   Edit,
   UserCheck,
-  Crown
+  Crown,
+  History,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -76,6 +80,14 @@ export const Players: React.FC = () => {
   const [warningReason, setWarningReason] = useState('Unprofessional conduct / missing practice');
   const [confirmingBanId, setConfirmingBanId] = useState<string | null>(null);
 
+  // Payout History and Lineup Chat states
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [salaryTransactions, setSalaryTransactions] = useState<SalaryTransaction[]>([]);
+  const [activeTeamTab, setActiveTeamTab] = useState<'roster' | 'chat'>('roster');
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const chatScrollRef = React.useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const unsubPlayers = watchPlayers((data) => {
       setPlayers(data);
@@ -105,6 +117,18 @@ export const Players: React.FC = () => {
       setLineups(data);
     });
 
+    const unsubTxs = watchSalaryTransactions((data) => {
+      setSalaryTransactions(data);
+    });
+
+    let unsubChats: (() => void) | null = null;
+    const userLineup = user?.lineup || '1st Lineup';
+    if (user) {
+      unsubChats = watchLineupChats(userLineup as any, (msgs) => {
+        setChatMessages(msgs);
+      });
+    }
+
     return () => {
       unsubPlayers();
       unsubCampaigns();
@@ -112,8 +136,19 @@ export const Players: React.FC = () => {
       unsubLogs();
       unsubSettings();
       unsubLineups();
+      unsubTxs();
+      if (unsubChats) {
+        unsubChats();
+      }
     };
-  }, [isAdmin]);
+  }, [isAdmin, user?.lineup, user]);
+
+  // Auto scroll chatbox to bottom
+  useEffect(() => {
+    if (activeTeamTab === 'chat' && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages, activeTeamTab]);
 
   // Run midnight daily auto-sync when page mounts or players/performanceLogs are updated
   useEffect(() => {
@@ -209,6 +244,53 @@ export const Players: React.FC = () => {
   const seasonRankedPlayers = getSeasonRankedPlayers(players, performanceLogs, mvpSettings);
   const seasonMvp = seasonRankedPlayers.length > 0 ? seasonRankedPlayers[0] : null;
 
+  const formatLastSeen = (lastActiveStr?: string) => {
+    if (!lastActiveStr) return 'offline';
+    try {
+      const lastActive = new Date(lastActiveStr);
+      const now = new Date();
+      const diffMs = now.getTime() - lastActive.getTime();
+      if (diffMs < 0) return 'offline';
+      
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      if (diffMins < 1) return 'offline (just now)';
+      if (diffMins < 60) return `offline (${diffMins}m ago)`;
+      
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `offline (${diffHours}h ago)`;
+      
+      const diffDays = Math.floor(diffHours / 24);
+      return `offline (${diffDays}d ago)`;
+    } catch (e) {
+      return 'offline';
+    }
+  };
+
+  const handleSendChatMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!user || !chatInput.trim()) return;
+    
+    const userLineup = user.lineup || '1st Lineup';
+    const myProfile = players.find(p => p.id === user.uid);
+    const photoUrl = myProfile?.photoUrl || '';
+    const role = user.inGameRole || 'Fragger';
+    
+    const msg = chatInput;
+    setChatInput('');
+    try {
+      await sendLineupChatMessage(
+        userLineup as any,
+        user.uid,
+        user.name,
+        role,
+        photoUrl,
+        msg
+      );
+    } catch (err: any) {
+      toast.error('Failed to send message: ' + err.message);
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-[#050507]">
       {/* Sidebar Layout Navigation */}
@@ -266,76 +348,19 @@ export const Players: React.FC = () => {
                 <span>Edit Profile</span>
               </button>
             )}
+
+            {/* Payout History Button */}
+            {user && (
+              <button
+                onClick={() => setIsHistoryOpen(true)}
+                className="bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 text-emerald-300 hover:text-white rounded-xl py-2 px-3 text-xs font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer font-mono shadow-md"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Payout History</span>
+              </button>
+            )}
           </div>
         </header>
-
-        {/* Welcome Back Section */}
-        {user && (
-          <div className="mb-8 bg-gradient-to-r from-purple-950/20 via-[#0e0e1a] to-purple-950/10 border border-purple-500/20 rounded-3xl p-5 relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            {/* Background glowing effects */}
-            <div className="absolute -top-12 -left-12 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"></div>
-            
-            <div className="flex items-center gap-4 relative z-10">
-              <div className="relative">
-                <div className="w-14 h-14 rounded-2xl border-2 border-purple-500/40 bg-[#050507] overflow-hidden flex items-center justify-center font-black text-purple-400 font-display text-lg uppercase shadow-lg shadow-purple-500/10">
-                  {(() => {
-                    const myProfile = players.find(p => p.id === user?.uid);
-                    return myProfile?.photoUrl ? (
-                      <img src={myProfile.photoUrl} alt={user.name} className="w-full h-full object-cover" />
-                    ) : (
-                      user.name.substring(0, 2)
-                    );
-                  })()}
-                </div>
-                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border border-[#050507] rounded-full animate-pulse" title="Online" />
-              </div>
-
-              <div>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-purple-400 font-bold block mb-0.5">Welcome Back, Champion</span>
-                <h3 className="text-xl font-display font-black text-white uppercase tracking-tight">{user.name}</h3>
-                <div className="flex flex-wrap gap-2 items-center mt-1">
-                  <span className="text-[9px] font-mono bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded uppercase">
-                    Role: <strong className="text-purple-300 font-semibold">{user.role}</strong>
-                  </span>
-                  <span className="text-[9px] font-mono bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded uppercase">
-                    Division: <strong className="text-purple-300 font-semibold">{user.lineup || '1st Lineup'}</strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Summary Metrics for logged in player */}
-            {(() => {
-              const myProfile = players.find(p => p.id === user?.uid);
-              if (!myProfile) return null;
-              return (
-                <div className="flex items-center gap-4 sm:border-l border-white/5 sm:pl-6 relative z-10 font-mono text-[10px] text-gray-400">
-                  <div className="text-center sm:text-left">
-                    <span className="block text-[8px] uppercase tracking-wider text-gray-500">My Balance</span>
-                    <strong className="text-emerald-400 text-sm font-bold block mt-0.5">${(myProfile.wallet || 0).toLocaleString()}</strong>
-                  </div>
-                  <div className="text-center sm:text-left border-l border-white/5 pl-4">
-                    <span className="block text-[8px] uppercase tracking-wider text-gray-500">My K/D Ratio</span>
-                    <strong className="text-white text-sm font-bold block mt-0.5">
-                      {((myProfile.matches && myProfile.matches > 0) ? ((myProfile.kills || 0) / Math.max(1, myProfile.matches - (myProfile.booyahs || 0))) : (myProfile.kd || 0)).toFixed(2)}
-                    </strong>
-                  </div>
-                  <div className="text-center sm:text-left border-l border-white/5 pl-4">
-                    <span className="block text-[8px] uppercase tracking-wider text-gray-500">My Warnings</span>
-                    <strong className={`text-sm font-bold block mt-0.5 ${myProfile.warnings > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
-                      {myProfile.warnings} / 3
-                    </strong>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* Dynamic Branded Hero Banner */}
-        <div className="mb-8">
-          <HeroBanner />
-        </div>
 
         {loading ? (
           <div className="h-64 flex items-center justify-center">
@@ -346,227 +371,6 @@ export const Players: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* "My Team" Dedicated Section */}
-            {user && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* My Team Section */}
-                <div className="lg:col-span-2 bg-gradient-to-r from-purple-950/10 via-[#0c0c14]/80 to-purple-950/10 border border-purple-500/15 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
-                  <div>
-                    <div className="flex items-start justify-between gap-4 mb-4">
-                      <div>
-                        <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter mb-1 flex items-center gap-2">
-                          <Award className="w-5 h-5 text-purple-400 animate-pulse" />
-                          <span>MY TEAM ({user.lineup || '1st Lineup'})</span>
-                        </h3>
-                        <p className="text-gray-400 text-xs font-mono">Meet the active roster fighting alongside you in the {user.lineup || '1st Lineup'}</p>
-                      </div>
-
-                      {user && (
-                        <button
-                          onClick={() => setIsRequestModalOpen(true)}
-                          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold uppercase rounded-lg shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all cursor-pointer font-mono"
-                        >
-                          Request Salary
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Show current player's request status if any exists */}
-                    {(() => {
-                      const myRequests = salaryRequests.filter(r => r.playerId === user?.uid && r.status === 'pending');
-                      if (myRequests.length === 0) return null;
-                      return (
-                        <div className="mb-4 bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
-                            <span className="text-xs text-purple-300 font-mono">Pending Salary Request of <strong className="text-white">${myRequests[0].amount}</strong> is in queue</span>
-                          </div>
-                          <span className="text-[10px] uppercase font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">Pending Approval</span>
-                        </div>
-                      );
-                    })()}
-
-                    {(() => {
-                      const myLineup = user.lineup || '1st Lineup';
-                      const teamMembers = players.filter(p => p.lineup === myLineup && p.status !== 'banned');
-                      
-                      if (teamMembers.length === 0) {
-                        return (
-                          <p className="text-gray-500 text-xs font-mono py-2">No other active players are currently assigned to your lineup division.</p>
-                        );
-                      }
-
-                      return (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {teamMembers.map(member => (
-                            <div key={member.id} className="bg-[#050507]/60 border border-white/5 hover:border-purple-500/20 rounded-2xl p-4 flex items-center space-x-3 transition-all">
-                              <div className="relative flex-shrink-0">
-                                <div className="w-10 h-10 rounded-full border border-purple-500/10 bg-purple-950/20 overflow-hidden flex items-center justify-center font-bold text-purple-400 font-mono text-sm uppercase">
-                                  {member.photoUrl ? (
-                                    <img src={member.photoUrl} alt={member.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    member.name.substring(0, 2)
-                                  )}
-                                </div>
-                                {/* lineup badge */}
-                                {(() => {
-                                  const mLineup = lineups.find(l => l.id === member.lineupId || l.name === member.lineup);
-                                  if (!mLineup?.logoUrl) return null;
-                                  return (
-                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#050507] border border-purple-500/30 rounded-full overflow-hidden flex items-center justify-center p-0.5">
-                                      <img src={mLineup.logoUrl} alt="lineup logo" className="w-full h-full object-contain" />
-                                    </div>
-                                  );
-                                })()}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h4 className="text-xs font-bold text-white truncate uppercase tracking-wider">{member.name}</h4>
-                                <span className="text-[9px] text-gray-500 block uppercase font-mono">{member.role}</span>
-                                <div className="flex items-center space-x-2 mt-1 text-[9px] font-mono text-purple-400">
-                                  <span>KD: <strong>{((member.matches && member.matches > 0) ? ((member.kills || 0) / Math.max(1, member.matches - (member.booyahs || 0))) : (member.kd || 0)).toFixed(2)}</strong></span>
-                                  <span className="text-gray-700">|</span>
-                                  <span>Kills: <strong>{member.kills}</strong></span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                {/* Sidebar Highlight Columns (Season MVP + Campaigns) */}
-                <div className="flex flex-col gap-6">
-                  {/* Season MVP Card */}
-                  <div 
-                    onClick={() => {
-                      if (seasonMvp) {
-                        setIsMvpModalOpen(true);
-                      }
-                    }}
-                    className="bg-[#0c0c14] border border-amber-500/25 rounded-3xl p-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.05)] cursor-pointer hover:border-amber-500/50 hover:shadow-[0_0_30px_rgba(245,158,11,0.15)] transition-all group"
-                  >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter flex items-center gap-2">
-                          <Crown className="w-5 h-5 text-amber-400 animate-pulse animate-bounce" />
-                          <span>SEASON MVP</span>
-                        </h3>
-                        <span className="text-[9px] font-mono text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded group-hover:bg-amber-500/25 transition-all">
-                          REVEAL SPOTLIGHT
-                        </span>
-                      </div>
-
-                      {seasonMvp ? (
-                        <div>
-                          <div className="flex items-center gap-4 mb-4 bg-white/5 p-3.5 rounded-2xl border border-white/5">
-                            <div className="relative flex-shrink-0">
-                              <div className="w-14 h-14 rounded-2xl border-2 border-amber-500 bg-[#050507] overflow-hidden flex items-center justify-center font-bold font-mono text-amber-400 text-lg shadow-[0_0_15px_rgba(245,158,11,0.25)]">
-                                {seasonMvp.photoUrl ? (
-                                  <img src={seasonMvp.photoUrl} alt={seasonMvp.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  "#1"
-                                )}
-                              </div>
-                              <span className="absolute -bottom-1 -right-1 bg-amber-500 text-black text-[8px] font-black font-mono w-4 h-4 flex items-center justify-center rounded-full border border-[#050507] shadow-md">
-                                👑
-                              </span>
-                            </div>
-                            <div className="min-w-0">
-                              <span className="text-[9px] font-mono text-amber-500 uppercase tracking-wider font-extrabold block">Season Dominator</span>
-                              <h4 className="text-lg font-display font-black text-white uppercase tracking-tight truncate leading-none mt-0.5">{seasonMvp.name}</h4>
-                              <span className="text-[10px] font-mono text-gray-400 uppercase mt-1 inline-block">{seasonMvp.role || 'Player'}</span>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-4 gap-2 border-t border-white/5 pt-4 font-mono text-[9px] text-gray-500">
-                            <div className="text-center">
-                              <span className="block uppercase text-[8px] mb-0.5">Matches</span>
-                              <strong className="text-white text-xs">{seasonMvp.matches}</strong>
-                            </div>
-                            <div className="text-center border-l border-white/5">
-                              <span className="block uppercase text-[8px] mb-0.5">Booyahs</span>
-                              <strong className="text-white text-xs">{seasonMvp.booyahs}</strong>
-                            </div>
-                            <div className="text-center border-l border-white/5">
-                              <span className="block uppercase text-[8px] mb-0.5">Kills</span>
-                              <strong className="text-white text-xs">{seasonMvp.kills}</strong>
-                            </div>
-                            <div className="text-center border-l border-white/5 bg-amber-500/5 rounded p-0.5">
-                              <span className="block uppercase text-[8px] text-amber-500 font-bold mb-0.5">SCORE</span>
-                              <strong className="text-amber-400 text-xs font-black">{seasonMvp.score}</strong>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="py-6 text-center text-gray-500 font-mono text-xs border border-dashed border-white/5 rounded-2xl">
-                          No performance logged this season.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Assigned Campaigns Section */}
-                  <div className="bg-[#0c0c14] border border-purple-500/15 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none"></div>
-                    <div>
-                      <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter mb-1 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-purple-400 animate-pulse" />
-                        <span>MATCH CAMPAIGNS</span>
-                      </h3>
-                      <p className="text-gray-400 text-xs mb-4 font-mono">Assigned campaigns for your lineup division ({user.lineup || '1st Lineup'})</p>
-
-                      {(() => {
-                        const myLineup = user.lineup || '1st Lineup';
-                        const assignedCampaigns = campaigns.filter(c => c.lineup === myLineup);
-
-                        if (assignedCampaigns.length === 0) {
-                          return (
-                            <div className="py-8 text-center text-gray-500 font-mono text-xs border border-dashed border-white/5 rounded-2xl">
-                              No campaigns assigned to your lineup.
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1">
-                            {assignedCampaigns.map(camp => (
-                              <div key={camp.id} className="bg-[#050507]/60 border border-white/5 rounded-xl p-3 flex flex-col gap-1 transition-all">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[140px]">{camp.title}</span>
-                                  <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
-                                    camp.status === 'win'
-                                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-                                      : camp.status === 'lose'
-                                        ? 'bg-red-500/15 text-red-400 border-red-500/25'
-                                        : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                                  }`}>
-                                    {camp.status}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
-                                  <span className="uppercase text-[9px] text-purple-400">{camp.category}</span>
-                                  <span>Invested: <strong className="text-white">${camp.amount}</strong></span>
-                                </div>
-                                {camp.status === 'win' && camp.prizeAmount !== undefined && (
-                                  <div className="text-[10px] font-mono text-emerald-400 mt-0.5 flex justify-between">
-                                    <span>Prize won:</span>
-                                    <strong>+${camp.prizeAmount}</strong>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {filteredPlayers.length === 0 ? (
               <div className="bg-[#0c0c14] border border-white/5 rounded-3xl p-12 text-center">
@@ -603,6 +407,12 @@ export const Players: React.FC = () => {
                                 player.name.substring(0, 2)
                               )}
                             </div>
+                            {/* Online status indicator dot directly on profile pic */}
+                            {!isBanned && (
+                              <span className={`absolute -top-0.5 -left-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0c0c14] z-10 ${
+                                player.isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-gray-500'
+                              }`} title={player.isOnline ? 'Online' : 'Offline'} />
+                            )}
                             {/* lineup logo badge */}
                             {(() => {
                               const pLineup = lineups.find(l => l.id === player.lineupId || l.name === player.lineup);
@@ -616,10 +426,21 @@ export const Players: React.FC = () => {
                           </div>
                           <div>
                             <div className="flex items-center space-x-2">
-                              <span className={`w-2 h-2 rounded-full ${isBanned ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
                               <h3 className="text-lg font-display font-bold text-white tracking-wide truncate max-w-[150px] uppercase">{player.name}</h3>
                             </div>
-                            <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest block mt-0.5">{player.role}</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5">
+                              <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest block">{player.role}</span>
+                              <span className="hidden sm:inline text-gray-700 text-[9px]">•</span>
+                              <span className={`text-[9px] font-mono block uppercase ${
+                                isBanned 
+                                  ? 'text-red-400' 
+                                  : player.isOnline 
+                                    ? 'text-emerald-400 font-bold' 
+                                    : 'text-gray-400'
+                              }`}>
+                                {isBanned ? 'banned' : player.isOnline ? 'online' : formatLastSeen(player.lastActive)}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -868,6 +689,62 @@ export const Players: React.FC = () => {
           onClose={() => setIsMvpModalOpen(false)}
           mvp={seasonMvp}
         />
+
+        {/* Payout/Salary History Side Drawer */}
+        {isHistoryOpen && (
+          <div className="fixed inset-0 z-50 overflow-hidden font-sans">
+            {/* Backdrop with blur */}
+            <div 
+              className="absolute inset-0 bg-[#000]/60 backdrop-blur-sm transition-opacity"
+              onClick={() => setIsHistoryOpen(false)}
+            />
+            
+            <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+              <div className="w-screen max-w-md bg-[#0a0a12] border-l border-white/10 shadow-2xl flex flex-col h-full relative">
+                {/* Header */}
+                <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#0e0e1a]">
+                  <div className="flex items-center space-x-2">
+                    <History className="w-5 h-5 text-emerald-400 animate-pulse" />
+                    <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter">Payout History</h3>
+                  </div>
+                  <button 
+                    onClick={() => setIsHistoryOpen(false)}
+                    className="text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all cursor-pointer font-mono text-xs border border-white/5 uppercase font-bold"
+                  >
+                    ✕ Close
+                  </button>
+                </div>
+
+                {/* Content list */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                  {salaryTransactions.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 font-mono text-xs py-12">
+                      <History className="w-10 h-10 text-gray-600 mb-2 animate-pulse" />
+                      <p>No salary payout history found.</p>
+                    </div>
+                  ) : (
+                    salaryTransactions.map((tx) => (
+                      <div key={tx.id} className="bg-[#11111a] border border-white/5 rounded-2xl p-4 space-y-2.5 hover:border-emerald-500/10 transition-all">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="text-xs font-black text-white uppercase tracking-wider">{tx.playerName}</h4>
+                            <span className="text-[9px] text-gray-500 font-mono block mt-0.5">{new Date(tx.date).toLocaleString()}</span>
+                          </div>
+                          <span className="text-xs font-black text-emerald-400 font-mono">+${tx.amount}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 leading-relaxed font-sans">{tx.reason}</p>
+                        <div className="flex items-center justify-between border-t border-white/5 pt-2 text-[9px] font-mono text-purple-400 uppercase">
+                          <span>Method: <strong className="text-white">{tx.paymentMethod || 'bKash'}</strong></span>
+                          <span>By: <strong className="text-white">{tx.addedBy}</strong></span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
