@@ -1,3 +1,4 @@
+//Herobanner
 import React, { useState, useEffect } from 'react';
 import { watchSiteSettings } from '../lib/settings';
 import { SiteSettings, HeroBannerItem } from '../types';
