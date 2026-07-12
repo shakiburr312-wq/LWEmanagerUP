@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Mail, Lock, User, Trophy, Shield, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { watchSiteSettings } from '../lib/settings';
 
 export const Login: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -15,9 +16,17 @@ export const Login: React.FC = () => {
   const [lineup, setLineup] = useState<'1st Lineup' | 'second lineup'>('1st Lineup');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
 
   const { login, signup, firebaseUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = watchSiteSettings((data) => {
+      setLogoUrl(data.logoUrl || '');
+    });
+    return () => unsub();
+  }, []);
 
   // If already logged in, redirect
   useEffect(() => {
@@ -88,8 +97,12 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md z-10">
         {/* Logo / Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-4 bg-[#0c0c14] rounded-2xl border border-white/5 mb-3 shadow-[0_0_30px_rgba(168,85,247,0.15)]">
-            <Trophy className="w-9 h-9 text-purple-400" />
+          <div className="inline-flex items-center justify-center p-4 bg-[#0c0c14] rounded-2xl border border-white/5 mb-3 shadow-[0_0_30px_rgba(168,85,247,0.15)] overflow-hidden w-[72px] h-[72px]">
+            {logoUrl ? (
+              <img src={logoUrl} alt="LWE Logo" className="w-full h-full object-cover rounded-xl" />
+            ) : (
+              <Trophy className="w-9 h-9 text-purple-400" />
+            )}
           </div>
           <h1 className="text-4xl font-black text-white italic uppercase tracking-tighter">
             LWE <span className="text-purple-500">Esports</span>
