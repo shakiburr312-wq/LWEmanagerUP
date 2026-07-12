@@ -30,6 +30,15 @@ export const Home: React.FC = () => {
   const [campaigns, setCampaigns] = useState<InvestmentCampaign[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Periodic ticker to refresh relative time / online presence checks in real-time
+  const [timeTicker, setTimeTicker] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeTicker(prev => prev + 1);
+    }, 15000); // 15 seconds
+    return () => clearInterval(timer);
+  }, []);
+
   const [salaryRequests, setSalaryRequests] = useState<SalaryRequest[]>([]);
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isMvpModalOpen, setIsMvpModalOpen] = useState(false);
