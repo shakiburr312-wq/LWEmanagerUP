@@ -6,7 +6,7 @@ import {
   createUserWithEmailAndPassword,
   User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { AppUser } from '../types';
 
@@ -79,16 +79,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (snapshot.exists()) {
             const data = snapshot.data();
+            const uRole = isChfpoint ? 'admin' : (data.role || 'player');
+            const uStatus = isChfpoint ? 'active' : (data.status || 'pending');
+            const uName = data.name || (isChfpoint ? 'LWE Admin' : 'Player');
+            const uInGameRole = data.inGameRole || 'Fragger';
+            const uLineup = data.lineup || '1st Lineup';
+            const uCreatedAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
+
             setUser({
               uid: fUser.uid,
-              name: data.name || (isChfpoint ? 'LWE Admin' : ''),
+              name: uName,
               email: data.email || '',
-              role: isChfpoint ? 'admin' : (data.role || 'player'),
-              status: isChfpoint ? 'active' : (data.status || 'pending'),
-              inGameRole: data.inGameRole || 'Fragger',
-              createdAt: data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString(),
-              lineup: data.lineup || '1st Lineup',
+              role: uRole,
+              status: uStatus,
+              inGameRole: uInGameRole,
+              createdAt: uCreatedAt,
+              lineup: uLineup,
             });
+
+            // Auto-create/sync player profile if they are active
+            if (uStatus === 'active') {
+              const playerRef = doc(db, 'players', fUser.uid);
+              getDoc(playerRef).then((pSnap) => {
+                if (!pSnap.exists()) {
+                  setDoc(playerRef, {
+                    userId: fUser.uid,
+                    name: uName,
+                    role: uInGameRole,
+                    status: 'active',
+                    kd: 0,
+                    kills: 0,
+                    damage: 0,
+                    salary: isChfpoint ? 0 : 300, // default salary
+                    warnings: 0,
+                    joinedAt: uCreatedAt,
+                    wallet: 0,
+                    matches: 0,
+                    booyahs: 0,
+                    lineup: uLineup,
+                    isOnline: true,
+                    lastActive: new Date().toISOString()
+                  }).catch(e => console.error("Failed to auto-create player profile:", e));
+                }
+              });
+            }
           } else {
             // Handle case where auth user exists but Firestore user doesn't yet
             setUser({
