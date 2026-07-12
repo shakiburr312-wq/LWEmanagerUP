@@ -129,6 +129,7 @@ export async function updatePlayer(playerId: string, data: Partial<PlayerProfile
     await updateDoc(playerRef, data);
   } catch (error) {
     console.warn("Firestore updatePlayer failed, updated locally only:", error);
+    throw error;
   }
 }
 
@@ -150,9 +151,9 @@ export async function updatePlayerWallet(playerId: string, amountChange: number)
 
   try {
     const playerRef = doc(db, 'players', playerId);
-    await updateDoc(playerRef, {
+    await setDoc(playerRef, {
       wallet: increment(amountChange)
-    });
+    }, { merge: true });
   } catch (error) {
     console.warn("Firestore updatePlayerWallet failed, updated locally only:", error);
   }
@@ -221,15 +222,15 @@ export async function addSalaryPayment(
     const financeTransRef = collection(db, 'financeTransactions');
     const date = new Date().toISOString();
 
-    await updateDoc(playerRef, {
+    await setDoc(playerRef, {
       wallet: increment(amount)
-    });
+    }, { merge: true });
 
     if (adminId) {
       const adminRef = doc(db, 'players', adminId);
-      await updateDoc(adminRef, {
+      await setDoc(adminRef, {
         wallet: increment(-amount)
-      });
+      }, { merge: true });
     }
 
     await addDoc(salaryTransRef, {
