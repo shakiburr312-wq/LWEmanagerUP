@@ -65,7 +65,7 @@ export const HeroBanner: React.FC = () => {
     exit: (dir: number) => ({
       x: dir < 0 ? '100%' : dir > 0 ? '-100%' : '0%',
       opacity: 0,
-    },),
+    }),
   };
 
   const getLinkIcon = (url?: string) => {
