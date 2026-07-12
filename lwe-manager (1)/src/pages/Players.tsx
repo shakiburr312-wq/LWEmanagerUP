@@ -244,6 +244,20 @@ export const Players: React.FC = () => {
   const seasonRankedPlayers = getSeasonRankedPlayers(players, performanceLogs, mvpSettings);
   const seasonMvp = seasonRankedPlayers.length > 0 ? seasonRankedPlayers[0] : null;
 
+  const checkIsOnline = (p: PlayerProfile) => {
+    if (p.isOnline) return true;
+    if (!p.lastActive) return false;
+    try {
+      const lastActive = new Date(p.lastActive);
+      const now = new Date();
+      const diffMs = now.getTime() - lastActive.getTime();
+      // Within 1 minute (60,000 ms)
+      return diffMs >= 0 && diffMs < 60000;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const formatLastSeen = (lastActiveStr?: string) => {
     if (!lastActiveStr) return 'offline';
     try {
@@ -253,7 +267,7 @@ export const Players: React.FC = () => {
       if (diffMs < 0) return 'offline';
       
       const diffMins = Math.floor(diffMs / (1000 * 60));
-      if (diffMins < 1) return 'offline (just now)';
+      if (diffMins < 1) return 'offline'; // within 1 minute they are rendered as online
       if (diffMins < 60) return `offline (${diffMins}m ago)`;
       
       const diffHours = Math.floor(diffMins / 60);
@@ -410,8 +424,8 @@ export const Players: React.FC = () => {
                             {/* Online status indicator dot directly on profile pic */}
                             {!isBanned && (
                               <span className={`absolute -top-0.5 -left-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#0c0c14] z-10 ${
-                                player.isOnline ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-gray-500'
-                              }`} title={player.isOnline ? 'Online' : 'Offline'} />
+                                checkIsOnline(player) ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-gray-500'
+                              }`} title={checkIsOnline(player) ? 'Online' : 'Offline'} />
                             )}
                             {/* lineup logo badge */}
                             {(() => {
@@ -434,11 +448,11 @@ export const Players: React.FC = () => {
                               <span className={`text-[9px] font-mono block uppercase ${
                                 isBanned 
                                   ? 'text-red-400' 
-                                  : player.isOnline 
+                                  : checkIsOnline(player) 
                                     ? 'text-emerald-400 font-bold' 
                                     : 'text-gray-400'
                               }`}>
-                                {isBanned ? 'banned' : player.isOnline ? 'online' : formatLastSeen(player.lastActive)}
+                                {isBanned ? 'banned' : checkIsOnline(player) ? 'online' : formatLastSeen(player.lastActive)}
                               </span>
                             </div>
                           </div>
