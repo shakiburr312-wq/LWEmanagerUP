@@ -112,16 +112,28 @@ export async function checkAndResetSeason(settings: MVPSettings, isAdmin: boolea
  * Watch site-wide settings in real-time
  */
 export function watchSiteSettings(callback: (settings: SiteSettings) => void) {
+  // Deliver current local state immediately as fallback
+  const local = localStorage.getItem('lwe_site_settings_fallback');
+  if (local) {
+    try {
+      callback(JSON.parse(local));
+    } catch (e) {
+      console.warn("Failed to parse local site settings:", e);
+    }
+  }
+
   const docRef = doc(db, 'settings', 'site');
   const unsub = onSnapshot(docRef, (snapshot) => {
     if (snapshot.exists()) {
-      callback(snapshot.data() as SiteSettings);
+      const data = snapshot.data() as SiteSettings;
+      localStorage.setItem('lwe_site_settings_fallback', JSON.stringify(data));
+      callback(data);
     } else {
       callback({});
     }
   }, (error) => {
     console.warn("Firestore watchSiteSettings failed:", error);
-    callback({});
+    // If watch fails (e.g., when not signed in on the Login page), keep the cached local storage settings
   });
   return unsub;
 }
@@ -130,10 +142,12 @@ export function watchSiteSettings(callback: (settings: SiteSettings) => void) {
  * Save site-wide settings
  */
 export async function saveSiteSettings(settings: SiteSettings) {
+  // Sanitize settings to remove undefined values before saving to Firestore
+  const sanitized = JSON.parse(JSON.stringify(settings)) as SiteSettings;
+  localStorage.setItem('lwe_site_settings_fallback', JSON.stringify(sanitized));
+
   try {
     const docRef = doc(db, 'settings', 'site');
-    // Sanitize settings to remove undefined values before saving to Firestore
-    const sanitized = JSON.parse(JSON.stringify(settings)) as SiteSettings;
     await setDoc(docRef, sanitized, { merge: true });
   } catch (error) {
     console.error("Firestore saveSiteSettings failed:", error);
