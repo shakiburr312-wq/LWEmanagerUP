@@ -362,7 +362,15 @@ export const Home: React.FC = () => {
 
                         {(() => {
                           const myLineup = user.lineup || '1st Lineup';
-                          const teamMembers = players.filter(p => p.lineup === myLineup && p.status !== 'banned');
+                          const teamMembers = players
+                            .filter(p => p.lineup === myLineup && p.status !== 'banned')
+                            .sort((a, b) => {
+                              const aOnline = checkIsOnline(a);
+                              const bOnline = checkIsOnline(b);
+                              if (aOnline && !bOnline) return -1;
+                              if (!aOnline && bOnline) return 1;
+                              return 0;
+                            });
                           
                           if (teamMembers.length === 0) {
                             return (
