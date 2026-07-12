@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 interface SalaryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddSalary: (amount: number, reason: string, paymentMethod: 'bKash' | 'Nagad') => Promise<void>;
+  onAddSalary: (amount: number, reason: string, paymentMethod: 'bKash' | 'Nagad', payoutMode: 'direct' | 'wallet_withdraw' | 'wallet_credit') => Promise<void>;
   player: PlayerProfile | null;
 }
 
@@ -14,6 +14,7 @@ export const SalaryModal: React.FC<SalaryModalProps> = ({ isOpen, onClose, onAdd
   const [amount, setAmount] = useState('1000');
   const [reason, setReason] = useState('June 2026 Monthly Salary');
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad'>('bKash');
+  const [payoutMode, setPayoutMode] = useState<'direct' | 'wallet_withdraw' | 'wallet_credit'>('direct');
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +28,15 @@ export const SalaryModal: React.FC<SalaryModalProps> = ({ isOpen, onClose, onAdd
       const currentMonthYear = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
       setReason(`${currentMonthYear} Monthly Salary`);
       setShowConfirm(false);
+
+      // Auto-set payoutMode based on wallet balance
+      if ((player.wallet || 0) > 0) {
+        setPayoutMode('wallet_withdraw');
+        setAmount((player.wallet || 0).toString());
+        setReason(`Withdraw accumulated earnings from wallet`);
+      } else {
+        setPayoutMode('direct');
+      }
     }
   }, [player, isOpen]);
 
@@ -53,7 +63,7 @@ export const SalaryModal: React.FC<SalaryModalProps> = ({ isOpen, onClose, onAdd
 
     setLoading(true);
     try {
-      await onAddSalary(amountNum, reason.trim(), paymentMethod);
+      await onAddSalary(amountNum, reason.trim(), paymentMethod, payoutMode);
       toast.success(`Successfully logged $${amountNum} payout via ${paymentMethod} for ${player.name}`);
       onClose();
     } catch (err: any) {
@@ -79,39 +89,58 @@ export const SalaryModal: React.FC<SalaryModalProps> = ({ isOpen, onClose, onAdd
         </h3>
         <p className="text-[11px] font-mono text-purple-400 uppercase tracking-widest mb-4">Player: {player.name}</p>
 
-        {player.warnings >= 3 ? (
-          <div className="bg-red-950/20 border border-red-500/25 rounded-xl p-3 mb-4 text-xs font-mono">
-            <p className="text-red-400 font-bold mb-1 font-sans">⚠️ 10% PENALTY DEDUCTION ACTIVE</p>
-            <p className="text-gray-400 text-[11px] leading-relaxed">
-              This player has {player.warnings} warning(s). Since warnings &ge; 3, a 10% penalty is automatically applied.
-              <br />
-              Base Monthly Rate: <span className="text-white">${player.salary}</span>
-              <br />
-              Deducted Rate (10% off): <span className="text-emerald-400 font-bold">${player.salary * 0.9}</span>
-            </p>
-          </div>
-        ) : player.warnings > 0 ? (
-          <div className="bg-purple-950/25 border border-purple-500/25 rounded-xl p-3 mb-4 text-xs font-mono">
-            <p className="text-purple-300 font-bold mb-1 font-sans">⚠️ ACTIVE WARNINGS DETECTED</p>
-            <p className="text-gray-400 text-[11px] leading-relaxed">
-              This player has {player.warnings} warning(s). 10% deduction triggers at 3 warnings.
-              <br />
-              Base Monthly Rate: <span className="text-white">${player.salary}</span>
-            </p>
-          </div>
-        ) : (
-          <div className="bg-[#050507] border border-white/5 rounded-xl p-3 mb-4 text-xs font-mono">
-            <p className="text-gray-400 text-[11px] leading-relaxed">
-              Base Monthly Rate: <span className="text-white">${player.salary}</span>
-              <br />
-              Warnings: <span className="text-white">0 / 3</span>
-            </p>
-          </div>
-        )}
+        <div className="bg-[#050507] border border-white/5 rounded-xl p-3 mb-4 text-xs font-mono">
+          <p className="text-gray-400 text-[11px] leading-relaxed">
+            Base Monthly Rate: <span className="text-white">${player.salary}</span>
+            <br />
+            Player Wallet Balance: <span className="text-emerald-400 font-bold">${player.wallet || 0}</span>
+            {player.warnings >= 3 && (
+              <>
+                <br />
+                <span className="text-red-400 font-bold">⚠️ 10% PENALTY ACTIVE ({player.warnings} Warnings)</span>
+              </>
+            )}
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!showConfirm ? (
             <>
+              {/* Payout Mode Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono text-gray-400 uppercase tracking-wider block">Payout Mode</label>
+                <select
+                  value={payoutMode}
+                  onChange={(e) => {
+                    const mode = e.target.value as 'direct' | 'wallet_withdraw' | 'wallet_credit';
+                    setPayoutMode(mode);
+                    if (player) {
+                      if (mode === 'wallet_withdraw') {
+                        setAmount((player.wallet || 0).toString());
+                        setReason('Withdraw accumulated earnings from wallet');
+                      } else if (mode === 'direct') {
+                        const baseSalary = player.salary || 0;
+                        const warningDeductionActive = (player.warnings || 0) >= 3;
+                        const finalSalary = warningDeductionActive ? baseSalary * 0.9 : baseSalary;
+                        setAmount(finalSalary.toString());
+                        setReason(`${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} Monthly Salary`);
+                      } else if (mode === 'wallet_credit') {
+                        const baseSalary = player.salary || 0;
+                        const warningDeductionActive = (player.warnings || 0) >= 3;
+                        const finalSalary = warningDeductionActive ? baseSalary * 0.9 : baseSalary;
+                        setAmount(finalSalary.toString());
+                        setReason(`Credit monthly earnings/salary to wallet`);
+                      }
+                    }
+                  }}
+                  className="w-full bg-[#0d0720] border border-purple-500/20 focus:border-purple-500 rounded py-2 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all font-mono text-xs"
+                >
+                  <option value="direct">Direct Payout (Cash to Player, Wallet unchanged)</option>
+                  <option value="wallet_withdraw">Wallet Withdrawal (Deduct from Player Wallet & Pay Cash)</option>
+                  <option value="wallet_credit">Credit Wallet (Add virtual balance to Player Wallet)</option>
+                </select>
+              </div>
+
               {/* Payment Method Selector */}
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-gray-400 uppercase tracking-wider block">Payment Method</label>
@@ -171,6 +200,9 @@ export const SalaryModal: React.FC<SalaryModalProps> = ({ isOpen, onClose, onAdd
               <h4 className="text-xs font-mono text-purple-400 uppercase tracking-widest font-black">Are you sure?</h4>
               <p className="text-sm text-gray-300 font-sans">
                 You are about to payout <strong className="text-emerald-400 font-mono">${amount}</strong> to <strong className="text-white">{player.name}</strong> via <strong className="text-purple-400 font-mono">{paymentMethod}</strong>.
+              </p>
+              <p className="text-[11px] text-gray-400 font-mono uppercase font-bold">
+                Payout Mode: <span className="text-purple-400">{payoutMode === 'wallet_withdraw' ? 'Wallet Withdrawal' : payoutMode === 'wallet_credit' ? 'Wallet Credit' : 'Direct Payout'}</span>
               </p>
               <p className="text-[11px] text-gray-500 italic">
                 Reference: "{reason}"
