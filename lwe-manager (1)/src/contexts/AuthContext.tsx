@@ -220,45 +220,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!user?.uid) return;
 
+    const setOnlinePresence = (isOnline: boolean) => {
+      import('../lib/players').then(({ updatePlayerPresence }) => {
+        updatePlayerPresence(user.uid, isOnline);
+      });
+    };
+
     // Immediately mark online
-    import('../lib/players').then(({ updatePlayerPresence }) => {
-      updatePlayerPresence(user.uid, true);
-    });
+    setOnlinePresence(true);
 
-    const handleOnline = () => {
-      import('../lib/players').then(({ updatePlayerPresence }) => {
-        updatePlayerPresence(user.uid, true);
-      });
-    };
-
-    const handleOffline = () => {
-      import('../lib/players').then(({ updatePlayerPresence }) => {
-        updatePlayerPresence(user.uid, false);
-      });
-    };
+    // Heartbeat every 25 seconds to keep the session alive and update lastActive timestamp
+    const heartbeat = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        setOnlinePresence(true);
+      }
+    }, 25000);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        handleOnline();
+        setOnlinePresence(true);
       } else {
-        handleOffline();
+        setOnlinePresence(false);
       }
     };
 
-    window.addEventListener('focus', handleOnline);
-    window.addEventListener('blur', handleOffline);
-    window.addEventListener('beforeunload', handleOffline);
+    const handleBeforeUnload = () => {
+      setOnlinePresence(false);
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      window.removeEventListener('focus', handleOnline);
-      window.removeEventListener('blur', handleOffline);
-      window.removeEventListener('beforeunload', handleOffline);
+      clearInterval(heartbeat);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       // Mark offline on unmount/logout
-      import('../lib/players').then(({ updatePlayerPresence }) => {
-        updatePlayerPresence(user.uid, false);
-      });
+      setOnlinePresence(false);
     };
   }, [user?.uid]);
 
