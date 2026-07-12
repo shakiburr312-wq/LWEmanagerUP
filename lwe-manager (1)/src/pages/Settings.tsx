@@ -150,7 +150,7 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleAddBanner = () => {
+  const handleAddBanner = async () => {
     if (!newBannerTitle.trim()) {
       toast.error('Please enter a banner title');
       return;
@@ -167,16 +167,44 @@ export const SettingsPage: React.FC = () => {
       linkUrl: newBannerLinkUrl.trim() || undefined
     };
 
-    setHeroBanners((prev) => [...prev, newItem]);
-    setNewBannerTitle('');
-    setNewBannerImageUrl('');
-    setNewBannerLinkUrl('');
-    toast.success('Banner added to list! Click "Commit Branding Settings" to save.');
+    const updated = [...heroBanners, newItem];
+    setHeroBanners(updated);
+
+    const toastId = toast.loading('Uploading and auto-saving hero banner...');
+    try {
+      await saveSiteSettings({
+        heroTitle: heroTitle.trim(),
+        heroSubtitle: heroSubtitle.trim(),
+        heroImageUrl: heroImageUrl.trim(),
+        logoUrl: logoUrl.trim(),
+        heroBanners: updated
+      });
+      toast.success('Hero banner added and saved successfully!', { id: toastId });
+      setNewBannerTitle('');
+      setNewBannerImageUrl('');
+      setNewBannerLinkUrl('');
+    } catch (err: any) {
+      toast.error('Failed to auto-save: ' + err.message, { id: toastId });
+    }
   };
 
-  const handleDeleteBanner = (id: string) => {
-    setHeroBanners((prev) => prev.filter((b) => b.id !== id));
-    toast.success('Banner removed from list! Click "Commit Branding Settings" to save.');
+  const handleDeleteBanner = async (id: string) => {
+    const updated = heroBanners.filter((b) => b.id !== id);
+    setHeroBanners(updated);
+
+    const toastId = toast.loading('Removing and auto-saving banner...');
+    try {
+      await saveSiteSettings({
+        heroTitle: heroTitle.trim(),
+        heroSubtitle: heroSubtitle.trim(),
+        heroImageUrl: heroImageUrl.trim(),
+        logoUrl: logoUrl.trim(),
+        heroBanners: updated
+      });
+      toast.success('Banner removed and saved successfully!', { id: toastId });
+    } catch (err: any) {
+      toast.error('Failed to auto-save: ' + err.message, { id: toastId });
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
