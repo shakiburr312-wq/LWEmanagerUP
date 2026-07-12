@@ -255,6 +255,69 @@ export const Players: React.FC = () => {
           </div>
         </header>
 
+        {/* Welcome Back Section */}
+        {user && (
+          <div className="mb-8 bg-gradient-to-r from-purple-950/20 via-[#0e0e1a] to-purple-950/10 border border-purple-500/20 rounded-3xl p-5 relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Background glowing effects */}
+            <div className="absolute -top-12 -left-12 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="relative">
+                <div className="w-14 h-14 rounded-2xl border-2 border-purple-500/40 bg-[#050507] overflow-hidden flex items-center justify-center font-black text-purple-400 font-display text-lg uppercase shadow-lg shadow-purple-500/10">
+                  {(() => {
+                    const myProfile = players.find(p => p.id === user?.uid);
+                    return myProfile?.photoUrl ? (
+                      <img src={myProfile.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      user.name.substring(0, 2)
+                    );
+                  })()}
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border border-[#050507] rounded-full animate-pulse" title="Online" />
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-purple-400 font-bold block mb-0.5">Welcome Back, Champion</span>
+                <h3 className="text-xl font-display font-black text-white uppercase tracking-tight">{user.name}</h3>
+                <div className="flex flex-wrap gap-2 items-center mt-1">
+                  <span className="text-[9px] font-mono bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded uppercase">
+                    Role: <strong className="text-purple-300 font-semibold">{user.role}</strong>
+                  </span>
+                  <span className="text-[9px] font-mono bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded uppercase">
+                    Division: <strong className="text-purple-300 font-semibold">{user.lineup || '1st Lineup'}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Summary Metrics for logged in player */}
+            {(() => {
+              const myProfile = players.find(p => p.id === user?.uid);
+              if (!myProfile) return null;
+              return (
+                <div className="flex items-center gap-4 sm:border-l border-white/5 sm:pl-6 relative z-10 font-mono text-[10px] text-gray-400">
+                  <div className="text-center sm:text-left">
+                    <span className="block text-[8px] uppercase tracking-wider text-gray-500">My Balance</span>
+                    <strong className="text-emerald-400 text-sm font-bold block mt-0.5">${(myProfile.wallet || 0).toLocaleString()}</strong>
+                  </div>
+                  <div className="text-center sm:text-left border-l border-white/5 pl-4">
+                    <span className="block text-[8px] uppercase tracking-wider text-gray-500">My K/D Ratio</span>
+                    <strong className="text-white text-sm font-bold block mt-0.5">
+                      {((myProfile.matches && myProfile.matches > 0) ? ((myProfile.kills || 0) / Math.max(1, myProfile.matches - (myProfile.booyahs || 0))) : (myProfile.kd || 0)).toFixed(2)}
+                    </strong>
+                  </div>
+                  <div className="text-center sm:text-left border-l border-white/5 pl-4">
+                    <span className="block text-[8px] uppercase tracking-wider text-gray-500">My Warnings</span>
+                    <strong className={`text-sm font-bold block mt-0.5 ${myProfile.warnings > 0 ? 'text-amber-500' : 'text-gray-400'}`}>
+                      {myProfile.warnings} / 3
+                    </strong>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* Dynamic Branded Hero Banner */}
         <div className="mb-8">
           <HeroBanner />
@@ -385,19 +448,47 @@ export const Players: React.FC = () => {
 
                       {seasonMvp ? (
                         <div>
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="relative flex-shrink-0">
-                              <div className="w-12 h-12 rounded-xl border border-amber-500/30 bg-[#050507] overflow-hidden flex items-center justify-center font-bold font-mono text-amber-400 text-base">
-                                {seasonMvp.photoUrl ? (
-                                  <img src={seasonMvp.photoUrl} alt={seasonMvp.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  "#1"
-                                )}
+                          <div className="flex items-center justify-between gap-3 mb-4 bg-white/5 p-3 rounded-2xl border border-white/5">
+                            {/* Season MVP */}
+                            <div className="flex items-center gap-3">
+                              <div className="relative flex-shrink-0">
+                                <div className="w-12 h-12 rounded-xl border-2 border-amber-500 bg-[#050507] overflow-hidden flex items-center justify-center font-bold font-mono text-amber-400 text-base shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                                  {seasonMvp.photoUrl ? (
+                                    <img src={seasonMvp.photoUrl} alt={seasonMvp.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    "#1"
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-bold text-white uppercase tracking-wide truncate max-w-[100px]">{seasonMvp.name}</h4>
+                                <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold">SEASON MVP</span>
                               </div>
                             </div>
-                            <div>
-                              <h4 className="text-base font-bold text-white uppercase tracking-wide truncate max-w-[140px]">{seasonMvp.name}</h4>
-                              <span className="text-[10px] font-mono text-purple-400 uppercase">{seasonMvp.role}</span>
+
+                            {/* Separator VS/AND badge */}
+                            <div className="text-[9px] font-mono text-gray-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded font-black">
+                              AND
+                            </div>
+
+                            {/* My Profile */}
+                            <div className="flex items-center gap-3 text-right">
+                              <div>
+                                <h4 className="text-xs font-bold text-white uppercase tracking-wide truncate max-w-[100px]">{user?.name}</h4>
+                                <span className="text-[10px] font-mono text-purple-400 uppercase font-semibold">MY PROFILE</span>
+                              </div>
+                              <div className="relative flex-shrink-0">
+                                <div className="w-12 h-12 rounded-xl border-2 border-purple-500 bg-[#050507] overflow-hidden flex items-center justify-center font-bold font-mono text-purple-400 text-base shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                                  {(() => {
+                                    const myProfile = players.find(p => p.id === user?.uid);
+                                    return myProfile?.photoUrl ? (
+                                      <img src={myProfile.photoUrl} alt={user?.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      user?.name?.substring(0, 2) || "ME"
+                                    );
+                                  })()}
+                                </div>
+                              </div>
                             </div>
                           </div>
 
