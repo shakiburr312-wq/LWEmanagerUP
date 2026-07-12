@@ -7,10 +7,11 @@ import {
   increment, 
   onSnapshot, 
   query, 
-  getDoc
+  getDoc,
+  orderBy
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { PlayerProfile } from '../types';
+import { PlayerProfile, SalaryTransaction } from '../types';
 
 const LOCAL_STORAGE_KEY = 'lwe_players_fallback_v2';
 
@@ -65,6 +66,8 @@ export function watchPlayers(callback: (players: PlayerProfile[]) => void) {
           photoUrl: data.photoUrl || '',
           mvpPhotoUrl: data.mvpPhotoUrl || '',
           lineupId: data.lineupId || '',
+          isOnline: data.isOnline || false,
+          lastActive: data.lastActive || '',
         });
       });
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(playersList));
@@ -311,5 +314,86 @@ export async function setBanStatus(playerId: string, isBanned: boolean) {
     }
   } catch (error) {
     console.warn("Firestore setBanStatus failed, updated locally only:", error);
+  }
+}
+
+let salaryTransactionWatchers: ((txs: SalaryTransaction[]) => void)[] = [];
+
+function notifySalaryTransactionWatchers(txs: SalaryTransaction[]) {
+  salaryTransactionWatchers.forEach(cb => cb(txs));
+}
+
+/**
+ * Watch salary payout transactions in real-time
+ */
+export function watchSalaryTransactions(callback: (txs: SalaryTransaction[]) => void) {
+  salaryTransactionWatchers.push(callback);
+
+  // Deliver current local state immediately
+  const local = localStorage.getItem('lwe_salary_transactions_fallback_v1');
+  const initial = local ? JSON.parse(local) : [];
+  callback(initial);
+
+  const q = query(collection(db, 'salaryTransactions'), orderBy('date', 'desc'));
+
+  const unsub = onSnapshot(
+    q,
+    (snapshot) => {
+      const txsList: SalaryTransaction[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        txsList.push({
+          id: doc.id,
+          playerId: data.playerId || '',
+          playerName: data.playerName || '',
+          amount: Number(data.amount) || 0,
+          reason: data.reason || '',
+          addedBy: data.addedBy || '',
+          date: data.date || '',
+          paymentMethod: data.paymentMethod || undefined
+        });
+      });
+      localStorage.setItem('lwe_salary_transactions_fallback_v1', JSON.stringify(txsList));
+      notifySalaryTransactionWatchers(txsList);
+    },
+    (error) => {
+      console.warn("Firestore watchSalaryTransactions failed, using local fallback:", error);
+    }
+  );
+
+  return () => {
+    salaryTransactionWatchers = salaryTransactionWatchers.filter(cb => cb !== callback);
+    unsub();
+  };
+}
+
+/**
+ * Update player's online presence status
+ */
+export async function updatePlayerPresence(playerId: string, isOnline: boolean) {
+  // Update local storage first
+  const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (local) {
+    const list: PlayerProfile[] = JSON.parse(local);
+    const index = list.findIndex(p => p.id === playerId);
+    if (index !== -1) {
+      list[index] = {
+        ...list[index],
+        isOnline,
+        lastActive: new Date().toISOString()
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+      notifyPlayerWatchers(list);
+    }
+  }
+
+  try {
+    const playerRef = doc(db, 'players', playerId);
+    await setDoc(playerRef, {
+      isOnline,
+      lastActive: new Date().toISOString()
+    }, { merge: true });
+  } catch (error) {
+    console.warn("Firestore updatePlayerPresence failed:", error);
   }
 }
