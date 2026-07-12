@@ -7,11 +7,13 @@ import { motion, AnimatePresence } from 'motion/react';
 export const HeroBanner: React.FC = () => {
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
   const [activeIndex, setActiveIndex] = useState(0);
+  const [direction, setDirection] = useState(0); // -1 for left, 1 for right
 
   useEffect(() => {
     const unsub = watchSiteSettings((data) => {
       setSiteSettings(data);
-      // Reset active index if the banners list changes to avoid out-of-bounds
+      // Reset active index with a sliding back transition when settings/banners list updates
+      setDirection(-1);
       setActiveIndex(0);
     });
     return () => unsub();
@@ -33,6 +35,7 @@ export const HeroBanner: React.FC = () => {
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
+      setDirection(1);
       setActiveIndex((prev) => (prev + 1) % banners.length);
     }, 6000);
     return () => clearInterval(interval);
@@ -40,12 +43,29 @@ export const HeroBanner: React.FC = () => {
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setDirection(-1);
     setActiveIndex((prev) => (prev - 1 + banners.length) % banners.length);
   };
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setDirection(1);
     setActiveIndex((prev) => (prev + 1) % banners.length);
+  };
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? '100%' : dir < 0 ? '-100%' : '0%',
+      opacity: 0,
+    }),
+    center: {
+      x: '0%',
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      x: dir < 0 ? '100%' : dir > 0 ? '-100%' : '0%',
+      opacity: 0,
+    },),
   };
 
   const getLinkIcon = (url?: string) => {
@@ -79,16 +99,21 @@ export const HeroBanner: React.FC = () => {
   const isClickable = !!currentBanner.linkUrl;
 
   const contentElement = (
-    <div className="absolute inset-0">
-      <AnimatePresence mode="wait">
+    <div className="absolute inset-0 overflow-hidden">
+      <AnimatePresence mode="wait" custom={direction} initial={false}>
         {currentBanner.imageUrl ? (
           <motion.div
-            key={currentBanner.id}
-            initial={{ opacity: 0, scale: 1.02 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-            className="absolute inset-0"
+            key={currentBanner.id || activeIndex}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+              x: { type: 'spring', stiffness: 220, damping: 26 },
+              opacity: { duration: 0.4 }
+            }}
+            className="absolute inset-0 w-full h-full"
           >
             <img 
               src={currentBanner.imageUrl} 
