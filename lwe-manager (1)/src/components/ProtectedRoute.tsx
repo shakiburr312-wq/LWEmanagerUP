@@ -124,9 +124,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminO
     }
   }
 
-  // If route is adminOnly but user is not admin, redirect to players dashboard
+  // If route is adminOnly but user is not admin, redirect to homepage
   if (adminOnly && !isAdmin) {
-    return <Navigate to="/players" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return <>{children}</>;
