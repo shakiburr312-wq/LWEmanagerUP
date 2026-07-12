@@ -155,9 +155,23 @@ export const Players: React.FC = () => {
     }
   };
 
-  const handleCommitSalary = async (amount: number, reason: string, paymentMethod: 'bKash' | 'Nagad') => {
+  const handleCommitSalary = async (
+    amount: number, 
+    reason: string, 
+    paymentMethod: 'bKash' | 'Nagad', 
+    payoutMode: 'direct' | 'wallet_withdraw' | 'wallet_credit'
+  ) => {
     if (salaryPlayer && user) {
-      await addSalaryPayment(salaryPlayer.id, salaryPlayer.name, amount, reason, user.name, paymentMethod, user.uid);
+      await addSalaryPayment(
+        salaryPlayer.id, 
+        salaryPlayer.name, 
+        amount, 
+        reason, 
+        user.name, 
+        paymentMethod, 
+        user.uid, 
+        payoutMode
+      );
     }
   };
 
@@ -448,47 +462,23 @@ export const Players: React.FC = () => {
 
                       {seasonMvp ? (
                         <div>
-                          <div className="flex items-center justify-between gap-3 mb-4 bg-white/5 p-3 rounded-2xl border border-white/5">
-                            {/* Season MVP */}
-                            <div className="flex items-center gap-3">
-                              <div className="relative flex-shrink-0">
-                                <div className="w-12 h-12 rounded-xl border-2 border-amber-500 bg-[#050507] overflow-hidden flex items-center justify-center font-bold font-mono text-amber-400 text-base shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                                  {seasonMvp.photoUrl ? (
-                                    <img src={seasonMvp.photoUrl} alt={seasonMvp.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    "#1"
-                                  )}
-                                </div>
+                          <div className="flex items-center gap-4 mb-4 bg-white/5 p-3.5 rounded-2xl border border-white/5">
+                            <div className="relative flex-shrink-0">
+                              <div className="w-14 h-14 rounded-2xl border-2 border-amber-500 bg-[#050507] overflow-hidden flex items-center justify-center font-bold font-mono text-amber-400 text-lg shadow-[0_0_15px_rgba(245,158,11,0.25)]">
+                                {seasonMvp.photoUrl ? (
+                                  <img src={seasonMvp.photoUrl} alt={seasonMvp.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  "#1"
+                                )}
                               </div>
-                              <div>
-                                <h4 className="text-xs font-bold text-white uppercase tracking-wide truncate max-w-[100px]">{seasonMvp.name}</h4>
-                                <span className="text-[10px] font-mono text-amber-400 uppercase font-semibold">SEASON MVP</span>
-                              </div>
+                              <span className="absolute -bottom-1 -right-1 bg-amber-500 text-black text-[8px] font-black font-mono w-4 h-4 flex items-center justify-center rounded-full border border-[#050507] shadow-md">
+                                👑
+                              </span>
                             </div>
-
-                            {/* Separator VS/AND badge */}
-                            <div className="text-[9px] font-mono text-gray-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded font-black">
-                              AND
-                            </div>
-
-                            {/* My Profile */}
-                            <div className="flex items-center gap-3 text-right">
-                              <div>
-                                <h4 className="text-xs font-bold text-white uppercase tracking-wide truncate max-w-[100px]">{user?.name}</h4>
-                                <span className="text-[10px] font-mono text-purple-400 uppercase font-semibold">MY PROFILE</span>
-                              </div>
-                              <div className="relative flex-shrink-0">
-                                <div className="w-12 h-12 rounded-xl border-2 border-purple-500 bg-[#050507] overflow-hidden flex items-center justify-center font-bold font-mono text-purple-400 text-base shadow-[0_0_10px_rgba(168,85,247,0.2)]">
-                                  {(() => {
-                                    const myProfile = players.find(p => p.id === user?.uid);
-                                    return myProfile?.photoUrl ? (
-                                      <img src={myProfile.photoUrl} alt={user?.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                      user?.name?.substring(0, 2) || "ME"
-                                    );
-                                  })()}
-                                </div>
-                              </div>
+                            <div className="min-w-0">
+                              <span className="text-[9px] font-mono text-amber-500 uppercase tracking-wider font-extrabold block">Season Dominator</span>
+                              <h4 className="text-lg font-display font-black text-white uppercase tracking-tight truncate leading-none mt-0.5">{seasonMvp.name}</h4>
+                              <span className="text-[10px] font-mono text-gray-400 uppercase mt-1 inline-block">{seasonMvp.role || 'Player'}</span>
                             </div>
                           </div>
 
