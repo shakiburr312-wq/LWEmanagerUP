@@ -65,7 +65,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
       allow update: if isAdmin() || (
                       isPlayerOwner(playerId, resource.data) &&
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoUrl', 'mvpPhotoUrl'])
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoUrl', 'mvpPhotoUrl', 'isOnline', 'lastActive'])
                     );
     }
 
