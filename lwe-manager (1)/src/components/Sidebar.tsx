@@ -16,7 +16,8 @@ import {
   ShieldAlert,
   BarChart2,
   Menu,
-  X
+  X,
+  Home as HomeIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -49,6 +50,12 @@ export const Sidebar: React.FC = () => {
   };
 
   const navItems = [
+    {
+      name: 'Home',
+      path: '/home',
+      icon: HomeIcon,
+      show: true,
+    },
     {
       name: 'Players List',
       path: '/players',
