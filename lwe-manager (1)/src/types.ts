@@ -33,6 +33,8 @@ export interface PlayerProfile {
   photoUrl?: string;
   mvpPhotoUrl?: string;
   lineupId?: string;
+  isOnline?: boolean;
+  lastActive?: string;
 }
 
 export interface Lineup {
@@ -64,6 +66,7 @@ export interface SalaryTransaction {
   reason: string;
   addedBy: string; // admin name
   date: string;
+  paymentMethod?: 'bKash' | 'Nagad';
 }
 
 export interface Complaint {
@@ -132,3 +135,15 @@ export interface InvestmentCampaign {
   addedBy: string;
   lineup?: '1st Lineup' | 'second lineup';
 }
+
+export interface ChatMessage {
+  id: string;
+  lineup: '1st Lineup' | 'second lineup';
+  senderId: string;
+  senderName: string;
+  senderRole?: string;
+  senderPhotoUrl?: string;
+  message: string;
+  timestamp: string;
+}
+
