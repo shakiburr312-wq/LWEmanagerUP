@@ -48,6 +48,15 @@ export const Players: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState('All');
   const [loading, setLoading] = useState(true);
 
+  // Periodic ticker to refresh relative time / online presence checks in real-time
+  const [timeTicker, setTimeTicker] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeTicker(prev => prev + 1);
+    }, 15000); // 15 seconds
+    return () => clearInterval(timer);
+  }, []);
+
   // Modals state
   const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerProfile | null>(null);
