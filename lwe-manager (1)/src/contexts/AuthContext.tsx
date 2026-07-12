@@ -182,8 +182,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Presence Tracking Effect
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // Immediately mark online
+    import('../lib/players').then(({ updatePlayerPresence }) => {
+      updatePlayerPresence(user.uid, true);
+    });
+
+    const handleOnline = () => {
+      import('../lib/players').then(({ updatePlayerPresence }) => {
+        updatePlayerPresence(user.uid, true);
+      });
+    };
+
+    const handleOffline = () => {
+      import('../lib/players').then(({ updatePlayerPresence }) => {
+        updatePlayerPresence(user.uid, false);
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleOnline();
+      } else {
+        handleOffline();
+      }
+    };
+
+    window.addEventListener('focus', handleOnline);
+    window.addEventListener('blur', handleOffline);
+    window.addEventListener('beforeunload', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleOnline);
+      window.removeEventListener('blur', handleOffline);
+      window.removeEventListener('beforeunload', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Mark offline on unmount/logout
+      import('../lib/players').then(({ updatePlayerPresence }) => {
+        updatePlayerPresence(user.uid, false);
+      });
+    };
+  }, [user?.uid]);
+
   const logout = async () => {
     try {
+      if (user?.uid) {
+        const { updatePlayerPresence } = await import('../lib/players');
+        await updatePlayerPresence(user.uid, false);
+      }
       await signOut(auth);
     } catch (error) {
       throw error;
