@@ -15,6 +15,7 @@ import { Finance } from './pages/Finance';
 import { DailyStats } from './pages/DailyStats';
 import { Profile } from './pages/Profile';
 import { PaymentHistory } from './pages/PaymentHistory';
+import { MatchCampaigns } from './pages/MatchCampaigns';
 import { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -55,6 +56,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Stats />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/campaigns" 
+            element={
+              <ProtectedRoute>
+                <MatchCampaigns />
               </ProtectedRoute>
             } 
           />
