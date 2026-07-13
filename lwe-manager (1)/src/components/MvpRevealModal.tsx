@@ -7,9 +7,10 @@ interface MvpRevealModalProps {
   isOpen: boolean;
   onClose: () => void;
   mvp: (PlayerProfile & { score?: number }) | null;
+  title?: string;
 }
 
-export const MvpRevealModal: React.FC<MvpRevealModalProps> = ({ isOpen, onClose, mvp }) => {
+export const MvpRevealModal: React.FC<MvpRevealModalProps> = ({ isOpen, onClose, mvp, title }) => {
   if (!isOpen || !mvp) return null;
 
   const scoreValue = mvp.score !== undefined ? mvp.score : 0;
@@ -112,7 +113,7 @@ export const MvpRevealModal: React.FC<MvpRevealModalProps> = ({ isOpen, onClose,
           <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-[#050507] px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.4)]">
             <Sparkles className="w-3.5 h-3.5 text-[#050507] fill-[#050507] animate-pulse" />
             <span className="text-[9px] font-mono font-black uppercase tracking-wider">
-              Season MVP
+              {title || 'Season MVP'}
             </span>
           </div>
         </header>
