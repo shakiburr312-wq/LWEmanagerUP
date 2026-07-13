@@ -132,6 +132,14 @@ export const Home: React.FC = () => {
   const seasonRankedPlayers = getSeasonRankedPlayers(players, performanceLogs, mvpSettings);
   const seasonMvp = seasonRankedPlayers.length > 0 ? seasonRankedPlayers[0] : null;
 
+  const firstLineupEarnings = campaigns
+    .filter(c => c.lineup === '1st Lineup' && c.status === 'win')
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+
+  const secondLineupEarnings = campaigns
+    .filter(c => c.lineup === 'second lineup' && c.status === 'win')
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+
   const checkIsOnline = (member: PlayerProfile) => {
     if (!member.isOnline || !member.lastActive) return false;
     try {
@@ -521,6 +529,50 @@ export const Home: React.FC = () => {
                           </div>
                         );
                       })()}
+                    </div>
+                  </div>
+
+                  {/* Lineup Earnings Card */}
+                  <div className="bg-[#0c0c14] border border-emerald-500/15 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none"></div>
+                    <div>
+                      <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter mb-1 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-emerald-400 animate-pulse" />
+                        <span>LINEUP DIVISION EARNINGS</span>
+                      </h3>
+                      <p className="text-gray-400 text-xs mb-4 font-mono">
+                        {isAdmin ? 'Performance results of active squads' : `Earnings accumulated by your division (${user.lineup || '1st Lineup'})`}
+                      </p>
+
+                      {isAdmin ? (
+                        <div className="space-y-4">
+                          <div className="bg-[#050507]/60 border border-white/5 rounded-2xl p-4 flex justify-between items-center">
+                            <div>
+                              <span className="text-[10px] font-mono text-purple-400 uppercase font-black block">1st Lineup</span>
+                              <span className="text-xs text-gray-500 font-mono">Squad Prize Pool</span>
+                            </div>
+                            <span className="text-lg font-mono font-bold text-emerald-400">${firstLineupEarnings.toLocaleString()}</span>
+                          </div>
+
+                          <div className="bg-[#050507]/60 border border-white/5 rounded-2xl p-4 flex justify-between items-center">
+                            <div>
+                              <span className="text-[10px] font-mono text-purple-400 uppercase font-black block">Second Lineup</span>
+                              <span className="text-xs text-gray-500 font-mono">Squad Prize Pool</span>
+                            </div>
+                            <span className="text-lg font-mono font-bold text-emerald-400">${secondLineupEarnings.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-[#050507]/60 border border-white/5 rounded-2xl p-4 flex justify-between items-center">
+                          <div>
+                            <span className="text-xs font-mono text-purple-400 uppercase font-black block">{user.lineup || '1st Lineup'}</span>
+                            <span className="text-[10px] text-gray-500 font-mono">Accumulated squad earnings</span>
+                          </div>
+                          <span className="text-xl font-mono font-bold text-emerald-400">
+                            ${((user.lineup || '1st Lineup') === '1st Lineup' ? firstLineupEarnings : secondLineupEarnings).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
