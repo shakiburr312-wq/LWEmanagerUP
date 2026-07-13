@@ -8,10 +8,13 @@ import { Players } from './pages/Players';
 import { Home } from './pages/Home';
 import { Approvals } from './pages/Approvals';
 import { Complaints } from './pages/Complaints';
+import { Chatbox } from './pages/Chatbox';
 import { SettingsPage } from './pages/Settings';
 import { Stats } from './pages/Stats';
 import { Finance } from './pages/Finance';
 import { DailyStats } from './pages/DailyStats';
+import { Profile } from './pages/Profile';
+import { PaymentHistory } from './pages/PaymentHistory';
 import { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -32,6 +35,14 @@ export default function App() {
             } 
           />
           <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/players" 
             element={
               <ProtectedRoute>
@@ -48,10 +59,26 @@ export default function App() {
             } 
           />
           <Route 
+            path="/payment-history" 
+            element={
+              <ProtectedRoute>
+                <PaymentHistory />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/complaints" 
             element={
               <ProtectedRoute>
                 <Complaints />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/chatbox" 
+            element={
+              <ProtectedRoute>
+                <Chatbox />
               </ProtectedRoute>
             } 
           />
