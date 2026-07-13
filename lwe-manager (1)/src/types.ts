@@ -12,6 +12,7 @@ export interface AppUser {
   inGameRole?: string;
   wallet?: number;
   lineup?: '1st Lineup' | 'second lineup';
+  ign?: string;
 }
 
 export interface PlayerProfile {
@@ -37,6 +38,7 @@ export interface PlayerProfile {
   lastActive?: string;
   assists?: number;
   healing?: number;
+  ign?: string;
 }
 
 export interface Lineup {
@@ -58,6 +60,10 @@ export interface SiteSettings {
   heroImageUrl?: string;
   logoUrl?: string;
   heroBanners?: HeroBannerItem[];
+  archivedCampaignWinnings?: number;
+  archivedCampaignOutlay?: number;
+  archived1stLineupWinnings?: number;
+  archivedSecondLineupWinnings?: number;
 }
 
 export interface SalaryTransaction {
