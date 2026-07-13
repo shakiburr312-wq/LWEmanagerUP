@@ -4,9 +4,12 @@ import { addFinanceTransaction, watchFinanceTransactions, deleteFinanceTransacti
 import { watchInvestmentCampaigns, addInvestmentCampaign, resolveInvestmentCampaign, deleteInvestmentCampaign } from '../lib/investments';
 import { watchSalaryRequests, approveSalaryRequest, rejectSalaryRequest } from '../lib/salaryRequests';
 import { watchPlayers } from '../lib/players';
-import { FinanceTransaction, InvestmentCampaign, SalaryRequest, PlayerProfile } from '../types';
+import { watchSiteSettings } from '../lib/settings';
+import { FinanceTransaction, InvestmentCampaign, SalaryRequest, PlayerProfile, SiteSettings } from '../types';
 import { Sidebar } from '../components/Sidebar';
 import { BalanceIndicator } from '../components/BalanceIndicator';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -69,6 +72,7 @@ export const Finance: React.FC = () => {
   // Resolving campaign states
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [prizeInput, setPrizeInput] = useState('');
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
 
   useEffect(() => {
     const unsubscribeTx = watchFinanceTransactions((data) => {
@@ -88,11 +92,16 @@ export const Finance: React.FC = () => {
       setPlayers(data);
     });
 
+    const unsubscribeSite = watchSiteSettings((data) => {
+      setSiteSettings(data);
+    });
+
     return () => {
       unsubscribeTx();
       unsubscribeCampaigns();
       unsubscribeRequests();
       unsubscribePlayers();
+      unsubscribeSite();
     };
   }, []);
 
@@ -248,6 +257,88 @@ export const Finance: React.FC = () => {
     }
   };
 
+  const handleBulkDeleteCampaigns = async (days: number) => {
+    const confirmMsg = `Are you sure you want to delete tournament & scrim campaigns older than ${days} days? This action is irreversible. The main finance statistics (earnings, treasury flow, net flows) will be preserved without any disruption.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const toastId = toast.loading(`Cleaning up campaigns older than ${days} days...`);
+    try {
+      const now = new Date();
+      const toDelete = campaigns.filter(c => {
+        if (!c.date) return false;
+        const compDate = new Date(c.date);
+        const diffMs = now.getTime() - compDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        return diffDays >= days;
+      });
+
+      if (toDelete.length === 0) {
+        toast.success(`No campaigns found older than ${days} days!`, { id: toastId });
+        return;
+      }
+
+      // 1. Calculate archived totals to preserve
+      const deletedWinnings = toDelete
+        .filter(c => c.status === 'win')
+        .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+      
+      const deletedOutlay = toDelete.reduce((sum, c) => sum + c.amount, 0);
+
+      const deleted1stWinnings = toDelete
+        .filter(c => c.lineup === '1st Lineup' && c.status === 'win')
+        .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+
+      const deletedSecondWinnings = toDelete
+        .filter(c => c.lineup === 'second lineup' && c.status === 'win')
+        .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+
+      // 2. Fetch current SiteSettings from Firestore
+      const docRef = doc(db, 'settings', 'site');
+      const snap = await getDoc(docRef);
+      const currentSettings = snap.exists() ? snap.data() : {};
+
+      const newWinnings = (currentSettings.archivedCampaignWinnings || 0) + deletedWinnings;
+      const newOutlay = (currentSettings.archivedCampaignOutlay || 0) + deletedOutlay;
+      const new1stWinnings = (currentSettings.archived1stLineupWinnings || 0) + deleted1stWinnings;
+      const newSecondWinnings = (currentSettings.archivedSecondLineupWinnings || 0) + deletedSecondWinnings;
+
+      // 3. Write updated settings
+      await setDoc(docRef, {
+        ...currentSettings,
+        archivedCampaignWinnings: newWinnings,
+        archivedCampaignOutlay: newOutlay,
+        archived1stLineupWinnings: new1stWinnings,
+        archivedSecondLineupWinnings: newSecondWinnings
+      }, { merge: true });
+
+      // 4. Batch delete the campaign documents
+      const deletePromises = toDelete.map(c => {
+        if (!c.id.startsWith('campaign_local_')) {
+          return deleteDoc(doc(db, 'investmentCampaigns', c.id));
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(deletePromises);
+
+      // 5. Update local storage cache to avoid lag
+      const localKey = 'lwe_campaigns_fallback_v2';
+      const cachedData = localStorage.getItem(localKey);
+      if (cachedData) {
+        try {
+          const parsed: InvestmentCampaign[] = JSON.parse(cachedData);
+          const remaining = parsed.filter(c => !toDelete.some(td => td.id === c.id));
+          localStorage.setItem(localKey, JSON.stringify(remaining));
+        } catch (e) {
+          console.error('Failed to parse cached campaigns during bulk delete', e);
+        }
+      }
+
+      toast.success(`Successfully archived and deleted ${toDelete.length} legacy campaign matches! Main finance updates preserved.`, { id: toastId });
+    } catch (err: any) {
+      toast.error('Clean-up failed: ' + err.message, { id: toastId });
+    }
+  };
+
   // Summary Math calculations
   const totalInvest = transactions
     .filter(t => t.type === 'invest')
@@ -265,10 +356,10 @@ export const Finance: React.FC = () => {
     .filter(t => t.type === 'withdraw')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalCampaignOutlay = campaigns.reduce((sum, c) => sum + c.amount, 0);
+  const totalCampaignOutlay = campaigns.reduce((sum, c) => sum + c.amount, 0) + (siteSettings.archivedCampaignOutlay || 0);
   const totalCampaignWinnings = campaigns
     .filter(c => c.status === 'win')
-    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0) + (siteSettings.archivedCampaignWinnings || 0);
 
   const netHisab = totalProfit + totalInvest - totalSalary - totalWithdraw + totalCampaignWinnings - totalCampaignOutlay;
 
@@ -296,11 +387,11 @@ export const Finance: React.FC = () => {
   // 4. Lineup winnings
   const firstLineupEarnings = campaigns
     .filter(c => c.lineup === '1st Lineup' && c.status === 'win')
-    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0) + (siteSettings.archived1stLineupWinnings || 0);
 
   const secondLineupEarnings = campaigns
     .filter(c => c.lineup === 'second lineup' && c.status === 'win')
-    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0) + (siteSettings.archivedSecondLineupWinnings || 0);
 
   // Chart data mapping (reverse to show chronological order)
   const chartData = [...transactions].reverse().map((t, idx) => ({
@@ -636,6 +727,23 @@ export const Finance: React.FC = () => {
                   </h3>
                   <p className="text-gray-500 text-[10px] mt-1 font-mono">Live tracking of champion rush, scrim, and paid matches</p>
                 </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-gray-400">DELETE LEGACY HISTORY:</span>
+                    <button
+                      onClick={() => handleBulkDeleteCampaigns(15)}
+                      className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer"
+                    >
+                      &gt; 15 Days
+                    </button>
+                    <button
+                      onClick={() => handleBulkDeleteCampaigns(30)}
+                      className="px-2.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer"
+                    >
+                      &gt; 30 Days
+                    </button>
+                  </div>
+                )}
               </div>
 
               {campaigns.length === 0 ? (
