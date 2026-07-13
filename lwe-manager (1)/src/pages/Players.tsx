@@ -243,8 +243,7 @@ export const Players: React.FC = () => {
   };
 
   const checkIsOnline = (p: PlayerProfile) => {
-    if (p.isOnline) return true;
-    if (!p.lastActive) return false;
+    if (!p.isOnline || !p.lastActive) return false;
     try {
       const lastActive = new Date(p.lastActive);
       const now = new Date();
@@ -368,17 +367,6 @@ export const Players: React.FC = () => {
               <option value="Support">Support</option>
               <option value="Assaulter">Assaulter</option>
             </select>
-
-            {/* Edit Profile Button */}
-            {user && (
-              <button
-                onClick={() => setIsProfileModalOpen(true)}
-                className="bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 text-purple-300 hover:text-white rounded-xl py-2 px-3 text-xs font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer font-mono shadow-md"
-              >
-                <Edit className="w-3.5 h-3.5" />
-                <span>Edit Profile</span>
-              </button>
-            )}
 
             {/* Payout History Button */}
             {user && (
