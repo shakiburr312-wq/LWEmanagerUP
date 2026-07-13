@@ -4,9 +4,10 @@ import { watchPlayers } from '../lib/players';
 import { watchInvestmentCampaigns } from '../lib/investments';
 import { watchSalaryRequests } from '../lib/salaryRequests';
 import { watchPerformanceLogs } from '../lib/performanceLogs';
-import { watchMVPSettings, checkAndResetSeason, watchLineups } from '../lib/settings';
+import { watchMVPSettings, checkAndResetSeason, watchLineups, watchSiteSettings, saveLineupLogo } from '../lib/settings';
 import { watchLineupChats, sendLineupChatMessage } from '../lib/chats';
-import { PlayerProfile, InvestmentCampaign, SalaryRequest, PerformanceLog, MVPSettings, Lineup, ChatMessage } from '../types';
+import { uploadImage } from '../lib/uploadImage';
+import { PlayerProfile, InvestmentCampaign, SalaryRequest, PerformanceLog, MVPSettings, Lineup, ChatMessage, SiteSettings } from '../types';
 import { getSeasonRankedPlayers } from '../utils/mvp';
 import { RequestSalaryModal } from '../components/RequestSalaryModal';
 import { MvpRevealModal } from '../components/MvpRevealModal';
@@ -20,7 +21,8 @@ import {
   MessageSquare, 
   Send,
   Home as HomeIcon,
-  Sparkles
+  Sparkles,
+  Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -29,6 +31,7 @@ export const Home: React.FC = () => {
   const [players, setPlayers] = useState<PlayerProfile[]>([]);
   const [campaigns, setCampaigns] = useState<InvestmentCampaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
 
   // Periodic ticker to refresh relative time / online presence checks in real-time
   const [timeTicker, setTimeTicker] = useState(0);
@@ -43,6 +46,13 @@ export const Home: React.FC = () => {
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isMvpModalOpen, setIsMvpModalOpen] = useState(false);
   const [lineups, setLineups] = useState<Lineup[]>([]);
+  const [selectedLineup, setSelectedLineup] = useState<'1st Lineup' | 'second lineup'>('1st Lineup');
+
+  useEffect(() => {
+    if (user?.lineup) {
+      setSelectedLineup(user.lineup as any);
+    }
+  }, [user?.lineup]);
 
   // Performance Logs and MVP states
   const [performanceLogs, setPerformanceLogs] = useState<PerformanceLog[]>([]);
@@ -87,6 +97,10 @@ export const Home: React.FC = () => {
       setLineups(data);
     });
 
+    const unsubSite = watchSiteSettings((data) => {
+      setSiteSettings(data);
+    });
+
     let unsubChats: (() => void) | null = null;
     const userLineup = user?.lineup || '1st Lineup';
     if (user) {
@@ -102,6 +116,7 @@ export const Home: React.FC = () => {
       unsubLogs();
       unsubSettings();
       unsubLineups();
+      unsubSite();
       if (unsubChats) {
         unsubChats();
       }
@@ -134,11 +149,11 @@ export const Home: React.FC = () => {
 
   const firstLineupEarnings = campaigns
     .filter(c => c.lineup === '1st Lineup' && c.status === 'win')
-    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0) + (siteSettings.archived1stLineupWinnings || 0);
 
   const secondLineupEarnings = campaigns
     .filter(c => c.lineup === 'second lineup' && c.status === 'win')
-    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0) + (siteSettings.archivedSecondLineupWinnings || 0);
 
   const checkIsOnline = (member: PlayerProfile) => {
     if (!member.isOnline || !member.lastActive) return false;
@@ -305,13 +320,81 @@ export const Home: React.FC = () => {
                   <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl pointer-events-none"></div>
                   <div>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                      <div>
-                        <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter mb-1 flex items-center gap-2">
-                          <Award className="w-5 h-5 text-purple-400 animate-pulse" />
-                          <span>MY TEAM ({user.lineup || '1st Lineup'})</span>
-                        </h3>
-                        <p className="text-gray-400 text-xs font-mono">Meet and coordinate with the active roster in the {user.lineup || '1st Lineup'}</p>
+                      <div className="flex items-center gap-4">
+                        {/* Lineup Logo */}
+                        {(() => {
+                          const currentLineup = lineups.find(l => l.id === selectedLineup || l.name === selectedLineup);
+                          const canUpload = isAdmin || user.role === 'admin' || (user.lineup === selectedLineup && user.inGameRole === 'IGL');
+                          return (
+                            <div className="relative group flex-shrink-0">
+                              <div className="w-14 h-14 bg-purple-950/20 border border-purple-500/20 rounded-2xl overflow-hidden flex items-center justify-center p-1">
+                                {currentLineup?.logoUrl ? (
+                                  <img src={currentLineup.logoUrl} alt="lineup logo" className="w-full h-full object-contain" />
+                                ) : (
+                                  <Award className="w-8 h-8 text-purple-400" />
+                                )}
+                              </div>
+                              {canUpload && (
+                                <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-2xl cursor-pointer transition-opacity">
+                                  <Upload className="w-4 h-4 text-white" />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        const file = e.target.files[0];
+                                        const toastId = toast.loading(`Uploading team logo for ${selectedLineup}...`);
+                                        try {
+                                          const url = await uploadImage(file, 'lineups');
+                                          await saveLineupLogo(selectedLineup, selectedLineup, url);
+                                          toast.success('Lineup logo updated successfully!', { id: toastId });
+                                        } catch (err: any) {
+                                          toast.error('Logo upload failed: ' + err.message, { id: toastId });
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        <div>
+                          <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter mb-1 flex items-center gap-2">
+                            <span>LINEUP ROSTER ({selectedLineup === '1st Lineup' ? '1st Lineup' : '2nd Lineup'})</span>
+                          </h3>
+                          <p className="text-gray-400 text-xs font-mono">Meet and coordinate with the active roster in the {selectedLineup === '1st Lineup' ? '1st Lineup' : '2nd Lineup'}</p>
+                        </div>
                       </div>
+
+                      {/* Lineup Switcher */}
+                      {isAdmin && (
+                        <div className="flex items-center gap-2 bg-[#050507]/60 border border-white/5 p-1 rounded-xl shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLineup('1st Lineup')}
+                            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                              selectedLineup === '1st Lineup'
+                                ? 'bg-purple-600 text-white'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            1st Lineup
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLineup('second lineup')}
+                            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase rounded-lg transition-all cursor-pointer ${
+                              selectedLineup === 'second lineup'
+                                ? 'bg-purple-600 text-white'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            2nd Lineup
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -332,7 +415,7 @@ export const Home: React.FC = () => {
                         })()}
 
                         {(() => {
-                          const myLineup = user.lineup || '1st Lineup';
+                          const myLineup = selectedLineup;
                           const teamMembers = players
                              .filter(p => p.lineup === myLineup && p.status !== 'banned')
                              .sort((a, b) => {
@@ -380,9 +463,21 @@ export const Home: React.FC = () => {
                                       })()}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                      <h4 className="text-xs font-bold text-white truncate uppercase tracking-wider">{member.name}</h4>
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[9px] text-gray-500 block uppercase font-mono">{member.role}</span>
+                                      <h4 className="text-xs font-bold text-white truncate uppercase tracking-wider flex items-center gap-1.5">
+                                        <span>{member.name}</span>
+                                        {member.inGameRole === 'IGL' && (
+                                          <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[8px] font-black font-mono px-1 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5 shrink-0">
+                                            👑 IGL
+                                          </span>
+                                        )}
+                                      </h4>
+                                      {member.ign && (
+                                        <span className="text-[9px] text-purple-400 font-mono block mt-0.5 lowercase">ign: {member.ign}</span>
+                                      )}
+                                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                                        <span className="text-[9px] text-gray-500 block uppercase font-mono">
+                                          {member.inGameRole ? `${member.role} / ${member.inGameRole}` : member.role}
+                                        </span>
                                         <span className={`text-[8px] font-mono uppercase ${online ? 'text-emerald-400 font-bold' : 'text-gray-400'}`}>
                                           {online ? 'online' : formatLastSeen(member.lastActive)}
                                         </span>
