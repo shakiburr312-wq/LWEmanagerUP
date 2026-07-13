@@ -10,7 +10,7 @@ import { getSeasonRankedPlayers, SeasonRankedPlayer } from '../utils/mvp';
 import { Sidebar } from '../components/Sidebar';
 import { BalanceIndicator } from '../components/BalanceIndicator';
 import { MvpRevealModal } from '../components/MvpRevealModal';
-import { Trophy, Crown, Star, Medal, Crosshair, Flame, TrendingUp, Sparkles, BarChart3, Calendar } from 'lucide-react';
+import { Trophy, Crown, Star, Medal, Crosshair, Flame, TrendingUp, Sparkles, BarChart3, Calendar, Heart, Shield, Zap, Skull } from 'lucide-react';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
 
@@ -76,6 +76,18 @@ export const Stats: React.FC = () => {
   const mvp = rankedPlayers.length > 0 ? rankedPlayers[0] : null;
   const runnerUp = rankedPlayers.length > 1 ? rankedPlayers[1] : null;
   const thirdPlace = rankedPlayers.length > 2 ? rankedPlayers[2] : null;
+
+  // Specific Category MVPs
+  const getTopPlayerByMetric = (metric: 'healing' | 'assists' | 'damage' | 'kills') => {
+    if (rankedPlayers.length === 0) return null;
+    const sorted = [...rankedPlayers].sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+    return (sorted[0] && (sorted[0][metric] || 0) > 0) ? sorted[0] : null;
+  };
+
+  const healingMvp = getTopPlayerByMetric('healing');
+  const assistMvp = getTopPlayerByMetric('assists');
+  const damageMvp = getTopPlayerByMetric('damage');
+  const killsMvp = getTopPlayerByMetric('kills');
 
   const formattedSeasonStart = mvpSettings.seasonStartDate 
     ? new Date(mvpSettings.seasonStartDate).toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -193,6 +205,77 @@ export const Stats: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Specific Category MVPs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Kills Wise MVP */}
+              <div className="bg-[#0c0c14] border border-red-500/10 hover:border-red-500/35 rounded-2xl p-4 flex items-center gap-4 transition-all relative overflow-hidden group shadow-lg">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-xl pointer-events-none"></div>
+                <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0 overflow-hidden">
+                  {killsMvp?.photoUrl || killsMvp?.mvpPhotoUrl ? (
+                    <img src={killsMvp.photoUrl || killsMvp.mvpPhotoUrl} alt={killsMvp.name} className="w-full h-full object-cover animate-fade-in" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Skull className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] font-mono font-black text-red-400 uppercase tracking-widest block mb-0.5">Kills MVP</span>
+                  <h4 className="text-sm font-sans font-bold text-white uppercase truncate">{killsMvp?.name || 'No MVP Yet'}</h4>
+                  <p className="text-[10px] font-mono text-gray-400 mt-1">Total Kills: <strong className="text-white">{killsMvp?.kills || 0}</strong></p>
+                </div>
+              </div>
+
+              {/* Actual Damage Wise MVP */}
+              <div className="bg-[#0c0c14] border border-amber-500/10 hover:border-amber-500/35 rounded-2xl p-4 flex items-center gap-4 transition-all relative overflow-hidden group shadow-lg">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 overflow-hidden">
+                  {damageMvp?.photoUrl || damageMvp?.mvpPhotoUrl ? (
+                    <img src={damageMvp.photoUrl || damageMvp.mvpPhotoUrl} alt={damageMvp.name} className="w-full h-full object-cover animate-fade-in" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Zap className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] font-mono font-black text-amber-400 uppercase tracking-widest block mb-0.5">Damage MVP</span>
+                  <h4 className="text-sm font-sans font-bold text-white uppercase truncate">{damageMvp?.name || 'No MVP Yet'}</h4>
+                  <p className="text-[10px] font-mono text-gray-400 mt-1">Total Damage: <strong className="text-white">{damageMvp?.damage || 0}</strong></p>
+                </div>
+              </div>
+
+              {/* Assist Wise MVP */}
+              <div className="bg-[#0c0c14] border border-blue-500/10 hover:border-blue-500/35 rounded-2xl p-4 flex items-center gap-4 transition-all relative overflow-hidden group shadow-lg">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none"></div>
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 overflow-hidden">
+                  {assistMvp?.photoUrl || assistMvp?.mvpPhotoUrl ? (
+                    <img src={assistMvp.photoUrl || assistMvp.mvpPhotoUrl} alt={assistMvp.name} className="w-full h-full object-cover animate-fade-in" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Shield className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] font-mono font-black text-blue-400 uppercase tracking-widest block mb-0.5">Assists MVP</span>
+                  <h4 className="text-sm font-sans font-bold text-white uppercase truncate">{assistMvp?.name || 'No MVP Yet'}</h4>
+                  <p className="text-[10px] font-mono text-gray-400 mt-1">Total Assists: <strong className="text-white">{assistMvp?.assists || 0}</strong></p>
+                </div>
+              </div>
+
+              {/* Healing Wise MVP */}
+              <div className="bg-[#0c0c14] border border-emerald-500/10 hover:border-emerald-500/35 rounded-2xl p-4 flex items-center gap-4 transition-all relative overflow-hidden group shadow-lg">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none"></div>
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 overflow-hidden">
+                  {healingMvp?.photoUrl || healingMvp?.mvpPhotoUrl ? (
+                    <img src={healingMvp.photoUrl || healingMvp.mvpPhotoUrl} alt={healingMvp.name} className="w-full h-full object-cover animate-fade-in" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Heart className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[9px] font-mono font-black text-emerald-400 uppercase tracking-widest block mb-0.5">Healing MVP</span>
+                  <h4 className="text-sm font-sans font-bold text-white uppercase truncate">{healingMvp?.name || 'No MVP Yet'}</h4>
+                  <p className="text-[10px] font-mono text-gray-400 mt-1">Total Healing: <strong className="text-white">{healingMvp?.healing || 0}</strong></p>
+                </div>
+              </div>
+            </div>
 
             {/* Podium Top 3 cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
