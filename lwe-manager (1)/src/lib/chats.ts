@@ -24,19 +24,19 @@ function notifyChatWatchers(lineup: string, messages: ChatMessage[]) {
 }
 
 /**
- * Watch real-time chat messages for a specific lineup division
+ * Watch real-time chat messages for a specific channel/lineup division
  */
-export function watchLineupChats(
-  lineup: '1st Lineup' | 'second lineup', 
+export function watchChats(
+  channel: string,
   callback: (messages: ChatMessage[]) => void
 ) {
-  if (!chatWatchers[lineup]) {
-    chatWatchers[lineup] = [];
+  if (!chatWatchers[channel]) {
+    chatWatchers[channel] = [];
   }
-  chatWatchers[lineup].push(callback);
+  chatWatchers[channel].push(callback);
 
   // Load from local storage fallback immediately for lightning-fast loads
-  const localKey = LOCAL_STORAGE_KEY_PREFIX + lineup.replace(/\s+/g, '_');
+  const localKey = LOCAL_STORAGE_KEY_PREFIX + channel.replace(/\s+/g, '_');
   const local = localStorage.getItem(localKey);
   const initial = local ? JSON.parse(local) : [];
   callback(initial);
@@ -53,10 +53,10 @@ export function watchLineupChats(
       const messages: ChatMessage[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.lineup === lineup) {
+        if (data.lineup === channel) {
           messages.push({
             id: doc.id,
-            lineup: data.lineup || lineup,
+            lineup: data.lineup || channel,
             senderId: data.senderId || '',
             senderName: data.senderName || '',
             senderRole: data.senderRole || '',
@@ -70,24 +70,24 @@ export function watchLineupChats(
       messages.reverse();
       
       localStorage.setItem(localKey, JSON.stringify(messages));
-      notifyChatWatchers(lineup, messages);
+      notifyChatWatchers(channel, messages);
     },
     (error) => {
-      console.warn(`Firestore watchLineupChats failed for ${lineup}, using local fallback:`, error);
+      console.warn(`Firestore watchChats failed for ${channel}, using local fallback:`, error);
     }
   );
 
   return () => {
-    chatWatchers[lineup] = chatWatchers[lineup].filter(cb => cb !== callback);
+    chatWatchers[channel] = chatWatchers[channel].filter(cb => cb !== callback);
     unsub();
   };
 }
 
 /**
- * Send a message to the lineup division chatbox
+ * Send a message to any channel (lineup or Global)
  */
-export async function sendLineupChatMessage(
-  lineup: '1st Lineup' | 'second lineup',
+export async function sendChatMessage(
+  channel: string,
   senderId: string,
   senderName: string,
   senderRole: string,
@@ -95,7 +95,7 @@ export async function sendLineupChatMessage(
   message: string
 ) {
   const messageData = {
-    lineup,
+    lineup: channel,
     senderId,
     senderName,
     senderRole,
@@ -105,7 +105,7 @@ export async function sendLineupChatMessage(
   };
 
   // Optimistic local update
-  const localKey = LOCAL_STORAGE_KEY_PREFIX + lineup.replace(/\s+/g, '_');
+  const localKey = LOCAL_STORAGE_KEY_PREFIX + channel.replace(/\s+/g, '_');
   const local = localStorage.getItem(localKey);
   const list: ChatMessage[] = local ? JSON.parse(local) : [];
   const mockId = 'msg_local_' + Math.random().toString(36).substr(2, 9);
@@ -120,15 +120,39 @@ export async function sendLineupChatMessage(
     list.shift(); // keep last 50
   }
   localStorage.setItem(localKey, JSON.stringify(list));
-  notifyChatWatchers(lineup, list);
+  notifyChatWatchers(channel, list);
 
   try {
     const docRef = await addDoc(collection(db, CHATS_COLLECTION), messageData);
     return docRef.id;
   } catch (error) {
-    console.warn("Firestore sendLineupChatMessage failed, message saved locally only:", error);
+    console.warn("Firestore sendChatMessage failed, message saved locally only:", error);
     return mockId;
   }
+}
+
+/**
+ * Watch real-time chat messages for a specific lineup division
+ */
+export function watchLineupChats(
+  lineup: '1st Lineup' | 'second lineup', 
+  callback: (messages: ChatMessage[]) => void
+) {
+  return watchChats(lineup, callback);
+}
+
+/**
+ * Send a message to the lineup division chatbox
+ */
+export async function sendLineupChatMessage(
+  lineup: '1st Lineup' | 'second lineup',
+  senderId: string,
+  senderName: string,
+  senderRole: string,
+  senderPhotoUrl: string,
+  message: string
+) {
+  return sendChatMessage(lineup, senderId, senderName, senderRole, senderPhotoUrl, message);
 }
 
 /**
