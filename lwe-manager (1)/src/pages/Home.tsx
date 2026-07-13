@@ -571,61 +571,7 @@ export const Home: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Assigned Campaigns Section */}
-                  <div className="bg-[#0c0c14] border border-purple-500/15 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none"></div>
-                    <div>
-                      <h3 className="text-base font-display font-black text-white italic uppercase tracking-tighter mb-1 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-purple-400 animate-pulse" />
-                        <span>MATCH CAMPAIGNS</span>
-                      </h3>
-                      <p className="text-gray-400 text-xs mb-4 font-mono">Assigned campaigns for your lineup division ({user.lineup || '1st Lineup'})</p>
 
-                      {(() => {
-                        const myLineup = user.lineup || '1st Lineup';
-                        const assignedCampaigns = campaigns.filter(c => c.lineup === myLineup);
-
-                        if (assignedCampaigns.length === 0) {
-                          return (
-                            <div className="py-8 text-center text-gray-500 font-mono text-xs border border-dashed border-white/5 rounded-2xl">
-                              No campaigns assigned to your lineup.
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1">
-                            {assignedCampaigns.map(camp => (
-                              <div key={camp.id} className="bg-[#050507]/60 border border-white/5 rounded-xl p-3 flex flex-col gap-1 transition-all">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold text-white uppercase tracking-wider truncate max-w-[140px]">{camp.title}</span>
-                                  <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
-                                    camp.status === 'win'
-                                      ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-                                      : camp.status === 'lose'
-                                        ? 'bg-red-500/15 text-red-400 border-red-500/25'
-                                        : 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                                  }`}>
-                                    {camp.status}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between text-[10px] font-mono text-gray-400">
-                                  <span className="uppercase text-[9px] text-purple-400">{camp.category}</span>
-                                  <span>Invested: <strong className="text-white">${camp.amount}</strong></span>
-                                </div>
-                                {camp.status === 'win' && camp.prizeAmount !== undefined && (
-                                  <div className="text-[10px] font-mono text-emerald-400 mt-0.5 flex justify-between">
-                                    <span>Prize won:</span>
-                                    <strong>+${camp.prizeAmount}</strong>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
 
                   {/* Lineup Earnings Card */}
                   <div className="bg-[#0c0c14] border border-emerald-500/15 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between">
