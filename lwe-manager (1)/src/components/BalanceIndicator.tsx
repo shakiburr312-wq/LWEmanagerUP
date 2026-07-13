@@ -5,7 +5,8 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { watchFinanceTransactions } from '../lib/finance';
 import { watchInvestmentCampaigns } from '../lib/investments';
-import { FinanceTransaction, InvestmentCampaign } from '../types';
+import { watchSiteSettings } from '../lib/settings';
+import { FinanceTransaction, InvestmentCampaign, SiteSettings } from '../types';
 import toast from 'react-hot-toast';
 
 export const BalanceIndicator: React.FC = () => {
@@ -14,56 +15,55 @@ export const BalanceIndicator: React.FC = () => {
   const [newWalletValue, setNewWalletValue] = useState('');
   const [saving, setSaving] = useState(false);
   
-  // Treasury net flow calculation
-  const [netFlow, setNetFlow] = useState(0);
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  const [campaigns, setCampaigns] = useState<InvestmentCampaign[]>([]);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
 
   useEffect(() => {
     if (!isAdmin) return;
     
-    let currentTxs: FinanceTransaction[] = [];
-    let currentCampaigns: InvestmentCampaign[] = [];
-
-    const recalculateTreasury = () => {
-      const totalInvest = currentTxs
-        .filter(t => t.type === 'invest')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      const totalProfit = currentTxs
-        .filter(t => t.type === 'tournament_profit')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      const totalSalary = currentTxs
-        .filter(t => t.type === 'salary_payment')
-        .reduce((sum, t) => sum + t.amount, 0);
-
-      const totalCampaignOutlay = currentCampaigns.reduce((sum, c) => sum + c.amount, 0);
-      const totalCampaignWinnings = currentCampaigns
-        .filter(c => c.status === 'win')
-        .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
-
-      setNetFlow(totalProfit + totalInvest - totalSalary + totalCampaignWinnings - totalCampaignOutlay);
-    };
-
-    // Listen to finance transactions to compute net flow in real-time
-    const unsubscribeTx = watchFinanceTransactions((transactions) => {
-      currentTxs = transactions;
-      recalculateTreasury();
+    const unsubscribeTx = watchFinanceTransactions((data) => {
+      setTransactions(data);
     });
 
-    const unsubscribeCampaigns = watchInvestmentCampaigns((campaigns) => {
-      currentCampaigns = campaigns;
-      recalculateTreasury();
+    const unsubscribeCampaigns = watchInvestmentCampaigns((data) => {
+      setCampaigns(data);
+    });
+
+    const unsubscribeSite = watchSiteSettings((data) => {
+      setSiteSettings(data);
     });
 
     return () => {
       unsubscribeTx();
       unsubscribeCampaigns();
+      unsubscribeSite();
     };
   }, [isAdmin]);
 
   if (!user) return null;
 
   const currentWallet = user.wallet || 0;
+
+  // Math calculations
+  const totalInvest = transactions
+    .filter(t => t.type === 'invest')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalProfit = transactions
+    .filter(t => t.type === 'tournament_profit')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalSalary = transactions
+    .filter(t => t.type === 'salary_payment')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalCampaignOutlay = campaigns.reduce((sum, c) => sum + c.amount, 0) + (siteSettings.archivedCampaignOutlay || 0);
+  const totalCampaignWinnings = campaigns
+    .filter(c => c.status === 'win')
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0) + (siteSettings.archivedCampaignWinnings || 0);
+
+  const netFlow = totalProfit + totalInvest - totalSalary + totalCampaignWinnings - totalCampaignOutlay;
 
   const handleUpdateAdminWallet = async (e: React.FormEvent) => {
     e.preventDefault();
