@@ -2,14 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Sidebar } from '../components/Sidebar';
 import { BalanceIndicator } from '../components/BalanceIndicator';
-import { watchLineupChats, sendLineupChatMessage, updateTypingStatus, watchLineupTyping } from '../lib/chats';
+import { watchChats, sendChatMessage, updateTypingStatus, watchLineupTyping } from '../lib/chats';
 import { watchPlayers } from '../lib/players';
 import { ChatMessage, PlayerProfile } from '../types';
-import { MessageSquare, Send, Users, Flame, Activity } from 'lucide-react';
+import { MessageSquare, Send, Users, Flame, Activity, Globe, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export const Chatbox: React.FC = () => {
   const { user } = useAuth();
+  const [activeChannel, setActiveChannel] = useState<'My Team' | 'Global'>('My Team');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [players, setPlayers] = useState<PlayerProfile[]>([]);
@@ -21,6 +22,7 @@ export const Chatbox: React.FC = () => {
   const isTypingRef = useRef(false);
 
   const userLineup = user?.lineup || '1st Lineup';
+  const currentChannel = activeChannel === 'My Team' ? userLineup : 'Global';
 
   // Real-time online status calculation (same robust check)
   const checkIsOnline = (p: PlayerProfile) => {
@@ -38,13 +40,15 @@ export const Chatbox: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    // 1. Subscribe to Chat Messages
-    const unsubChats = watchLineupChats(userLineup as any, (msgs) => {
+    setLoading(true);
+
+    // 1. Subscribe to Chat Messages for active channel
+    const unsubChats = watchChats(currentChannel, (msgs) => {
       setChatMessages(msgs);
       setLoading(false);
       
       // Mark all messages as read since we are on the chatbox page
-      localStorage.setItem(`chat_last_read_time_${userLineup}`, new Date().toISOString());
+      localStorage.setItem(`chat_last_read_time_${currentChannel}`, new Date().toISOString());
     });
 
     // 2. Subscribe to Players Roster
@@ -52,8 +56,8 @@ export const Chatbox: React.FC = () => {
       setPlayers(data);
     });
 
-    // 3. Subscribe to Real-time Lineup Typing status
-    const unsubTyping = watchLineupTyping(userLineup, user.uid, (typingNames) => {
+    // 3. Subscribe to Real-time Typing status
+    const unsubTyping = watchLineupTyping(currentChannel, user.uid, (typingNames) => {
       setTypingUsers(typingNames);
     });
 
@@ -61,12 +65,12 @@ export const Chatbox: React.FC = () => {
       unsubChats();
       unsubPlayers();
       unsubTyping();
-      // Ensure we clean up typing status when unmounting
+      // Ensure we clean up typing status when switching/unmounting
       if (isTypingRef.current) {
-        updateTypingStatus(user.uid, user.name, userLineup, false);
+        updateTypingStatus(user.uid, user.name, currentChannel, false);
       }
     };
-  }, [user, userLineup]);
+  }, [user, activeChannel, currentChannel]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -83,7 +87,7 @@ export const Chatbox: React.FC = () => {
     // Start typing status
     if (!isTypingRef.current) {
       isTypingRef.current = true;
-      updateTypingStatus(user.uid, user.name, userLineup, true);
+      updateTypingStatus(user.uid, user.name, currentChannel, true);
     }
 
     // Debounce to stop typing status after 3.5 seconds of inactivity
@@ -93,7 +97,7 @@ export const Chatbox: React.FC = () => {
 
     typingTimeoutRef.current = setTimeout(() => {
       isTypingRef.current = false;
-      updateTypingStatus(user.uid, user.name, userLineup, false);
+      updateTypingStatus(user.uid, user.name, currentChannel, false);
     }, 3500);
   };
 
@@ -109,15 +113,15 @@ export const Chatbox: React.FC = () => {
       clearTimeout(typingTimeoutRef.current);
     }
     isTypingRef.current = false;
-    updateTypingStatus(user.uid, user.name, userLineup, false);
+    updateTypingStatus(user.uid, user.name, currentChannel, false);
 
     const myProfile = players.find(p => p.id === user.uid);
     const photoUrl = myProfile?.photoUrl || '';
     const role = user.inGameRole || 'Fragger';
 
     try {
-      await sendLineupChatMessage(
-        userLineup as any,
+      await sendChatMessage(
+        currentChannel,
         user.uid,
         user.name,
         role,
@@ -129,9 +133,17 @@ export const Chatbox: React.FC = () => {
     }
   };
 
-  // Filter team members in my lineup
-  const teamMembers = players
-    .filter(p => p.lineup === userLineup && p.status !== 'banned')
+  // Filter members on the right panel based on selection:
+  // - If 'My Team': only members in my lineup
+  // - If 'Global': all active players on the platform who are online, or sorted by online
+  const sidebarPlayers = players
+    .filter(p => {
+      if (p.status === 'banned') return false;
+      if (activeChannel === 'My Team') {
+        return p.lineup === userLineup;
+      }
+      return true; // show all for Global channel
+    })
     .sort((a, b) => {
       const aOnline = checkIsOnline(a);
       const bOnline = checkIsOnline(b);
@@ -152,9 +164,37 @@ export const Chatbox: React.FC = () => {
               <MessageSquare className="w-6 h-6 text-purple-500 animate-pulse" />
               <span>Lineup <span className="text-purple-500">Chatbox</span></span>
             </h2>
-            <p className="text-gray-400 text-xs font-mono">Real-time gaming division frequency for: <strong className="text-purple-400 uppercase">{userLineup}</strong></p>
+            <p className="text-gray-400 text-xs font-mono">
+              Currently connected: <strong className="text-purple-400 uppercase">{activeChannel === 'My Team' ? `My Team (${userLineup})` : 'Global Frequency'}</strong>
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            {/* Channel Toggle */}
+            <div className="flex bg-[#11111a] border border-white/5 p-1 rounded-xl gap-1">
+              <button
+                onClick={() => setActiveChannel('My Team')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeChannel === 'My Team'
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Shield className="w-3 h-3" />
+                <span>My Team</span>
+              </button>
+              <button
+                onClick={() => setActiveChannel('Global')}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeChannel === 'Global'
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Globe className="w-3 h-3" />
+                <span>Global</span>
+              </button>
+            </div>
+
             <BalanceIndicator />
           </div>
         </header>
@@ -177,7 +217,9 @@ export const Chatbox: React.FC = () => {
                 <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 font-mono text-xs py-8">
                   <MessageSquare className="w-12 h-12 text-purple-500/20 mb-3 animate-bounce" />
                   <p className="text-gray-400 font-bold text-sm">NO MESSAGES LOGGED YET</p>
-                  <p className="text-[10px] text-gray-600 mt-1 max-w-[240px]">Be the first to connect with your team lineup in this secure channel!</p>
+                  <p className="text-[10px] text-gray-600 mt-1 max-w-[240px]">
+                    Be the first to say hello in this {activeChannel === 'My Team' ? 'lineup' : 'global'} secure channel!
+                  </p>
                 </div>
               ) : (
                 chatMessages.map((msg, index) => {
@@ -248,7 +290,7 @@ export const Chatbox: React.FC = () => {
                   type="text"
                   value={chatInput}
                   onChange={handleInputChange}
-                  placeholder={`Type a secure transmission to ${userLineup}...`}
+                  placeholder={`Type a secure transmission to ${activeChannel === 'My Team' ? userLineup : 'Global Chatbox'}...`}
                   className="flex-1 bg-[#050507] border border-white/10 focus:border-purple-500 focus:outline-none rounded-xl py-3 px-4 text-xs text-white placeholder-gray-500 transition-all font-sans"
                 />
                 <button
@@ -262,14 +304,16 @@ export const Chatbox: React.FC = () => {
             </div>
           </div>
 
-          {/* Active Lineup Teammates Panel (Desktop Sidebar Only) */}
+          {/* Active Members Sidebar */}
           <div className="hidden lg:flex flex-col w-64 bg-[#0a0a10] border-l border-white/5 h-full flex-shrink-0">
             <div className="p-4 border-b border-white/5 flex items-center gap-2 bg-[#0e0e16]/40">
               <Users className="w-4 h-4 text-purple-400" />
-              <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">Active Teammates</span>
+              <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">
+                {activeChannel === 'My Team' ? 'Lineup Members' : 'All Roster Members'}
+              </span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {teamMembers.map((member) => {
+              {sidebarPlayers.map((member) => {
                 const online = checkIsOnline(member);
                 return (
                   <div 
@@ -291,7 +335,7 @@ export const Chatbox: React.FC = () => {
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-white truncate uppercase tracking-wide">{member.name}</p>
-                        <p className="text-[9px] text-gray-500 uppercase font-mono truncate">{member.role}</p>
+                        <p className="text-[8px] text-gray-500 uppercase font-mono truncate">{member.role} • {member.lineup}</p>
                       </div>
                     </div>
                     {online && (
