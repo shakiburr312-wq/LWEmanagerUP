@@ -13,6 +13,7 @@ export const Profile: React.FC = () => {
   const { user } = useAuth();
   const [players, setPlayers] = useState<any[]>([]);
   const [name, setName] = useState('');
+  const [ign, setIgn] = useState('');
   const [role, setRole] = useState('Fragger');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [mvpFile, setMvpFile] = useState<File | null>(null);
@@ -35,6 +36,7 @@ export const Profile: React.FC = () => {
   useEffect(() => {
     if (user) {
       setName(playerProfile?.name || user?.name || '');
+      setIgn(playerProfile?.ign || user?.ign || '');
       setRole(playerProfile?.role || 'Fragger');
       setPhotoPreview(playerProfile?.photoUrl || '');
       setMvpPreview(playerProfile?.mvpPhotoUrl || '');
@@ -94,7 +96,8 @@ export const Profile: React.FC = () => {
       // 3. Update users collection
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, {
-        name: name.trim()
+        name: name.trim(),
+        ign: ign.trim()
       });
 
       // 4. Update or Create player profile in Firestore & local storage
@@ -104,6 +107,7 @@ export const Profile: React.FC = () => {
 
       const updatedPlayerData = {
         name: name.trim(),
+        ign: ign.trim(),
         role: role,
         photoUrl: finalPhotoUrl,
         mvpPhotoUrl: finalMvpPhotoUrl
@@ -116,6 +120,7 @@ export const Profile: React.FC = () => {
         const initialProfile = {
           userId: user.uid,
           name: name.trim(),
+          ign: ign.trim(),
           role: role,
           status: 'active' as const,
           kd: 0,
@@ -192,15 +197,30 @@ export const Profile: React.FC = () => {
                   <span>Identity Settings</span>
                 </h3>
 
-                {/* Gamer Name */}
+                {/* Full Name */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono">
+                    Full Name / Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. John Doe"
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-3 px-4 text-sm text-white focus:outline-none transition-colors"
+                    required
+                  />
+                </div>
+
+                {/* In-Game Name (IGN) */}
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono">
                     In-Game Name (IGN)
                   </label>
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={ign}
+                    onChange={(e) => setIgn(e.target.value)}
                     placeholder="e.g. LWE_Demon"
                     className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-3 px-4 text-sm text-white focus:outline-none transition-colors"
                     required
