@@ -444,11 +444,21 @@ export const Players: React.FC = () => {
                             })()}
                           </div>
                           <div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-2">
                               <h3 className="text-lg font-display font-bold text-white tracking-wide truncate max-w-[150px] uppercase">{player.name}</h3>
+                              {player.inGameRole === 'IGL' && (
+                                <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[8px] font-black font-mono px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5 shadow-sm">
+                                  👑 IGL
+                                </span>
+                              )}
                             </div>
+                            {player.ign && (
+                              <span className="text-[9px] text-purple-400 font-mono block mt-0.5 lowercase">ign: {player.ign}</span>
+                            )}
                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-0.5">
-                              <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest block">{player.role}</span>
+                              <span className="text-[10px] font-mono text-purple-400 uppercase tracking-widest block">
+                                {player.inGameRole ? `${player.role} / ${player.inGameRole}` : player.role}
+                              </span>
                               <span className="hidden sm:inline text-gray-700 text-[9px]">•</span>
                               <span className={`text-[9px] font-mono block uppercase ${
                                 isBanned 
