@@ -144,6 +144,8 @@ export interface InvestmentCampaign {
   resolvedAt?: string;
   addedBy: string;
   lineup?: '1st Lineup' | 'second lineup';
+  startTime?: string;
+  reminderSent?: boolean;
 }
 
 export interface ChatMessage {
