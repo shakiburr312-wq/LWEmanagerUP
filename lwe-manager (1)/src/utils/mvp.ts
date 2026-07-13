@@ -7,6 +7,8 @@ export interface SeasonRankedPlayer extends PlayerProfile {
   damage: number;
   matches: number;
   booyahs: number;
+  assists: number;
+  healing: number;
 }
 
 /**
@@ -25,10 +27,10 @@ export function getSeasonRankedPlayers(
   const seasonLogs = logs.filter(log => log.date >= seasonStartDate);
 
   // Group metrics by player ID
-  const playerStatsMap: Record<string, { kills: number; damage: number; matches: number; booyahs: number }> = {};
+  const playerStatsMap: Record<string, { kills: number; damage: number; matches: number; booyahs: number; assists: number; healing: number }> = {};
   
   activePlayers.forEach(p => {
-    playerStatsMap[p.id] = { kills: 0, damage: 0, matches: 0, booyahs: 0 };
+    playerStatsMap[p.id] = { kills: 0, damage: 0, matches: 0, booyahs: 0, assists: 0, healing: 0 };
   });
 
   seasonLogs.forEach(log => {
@@ -37,6 +39,8 @@ export function getSeasonRankedPlayers(
       playerStatsMap[log.playerId].damage += Number(log.damage) || 0;
       playerStatsMap[log.playerId].matches += Number(log.matches) || 0;
       playerStatsMap[log.playerId].booyahs += Number(log.booyahs) || 0;
+      playerStatsMap[log.playerId].assists += Number(log.assists) || 0;
+      playerStatsMap[log.playerId].healing += Number(log.healing) || 0;
     }
   });
 
@@ -47,6 +51,8 @@ export function getSeasonRankedPlayers(
     const totalDamage = stats.damage;
     const totalMatches = stats.matches;
     const totalBooyahs = stats.booyahs;
+    const totalAssists = stats.assists;
+    const totalHealing = stats.healing;
 
     // Formula: (totalKills × killsWeight) + (totalDamage × damageWeight) + ((totalMatches > 0 ? totalKills/divisor : 0) × kdWeight)
     const deaths = totalMatches - totalBooyahs;
@@ -62,6 +68,8 @@ export function getSeasonRankedPlayers(
       damage: totalDamage,
       matches: totalMatches,
       booyahs: totalBooyahs,
+      assists: totalAssists,
+      healing: totalHealing,
       score: Number(score.toFixed(1))
     };
   });
