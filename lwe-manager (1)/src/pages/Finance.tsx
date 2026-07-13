@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { addFinanceTransaction, watchFinanceTransactions, deleteFinanceTransaction } from '../lib/finance';
 import { watchInvestmentCampaigns, addInvestmentCampaign, resolveInvestmentCampaign, deleteInvestmentCampaign } from '../lib/investments';
 import { watchSalaryRequests, approveSalaryRequest, rejectSalaryRequest } from '../lib/salaryRequests';
-import { FinanceTransaction, InvestmentCampaign, SalaryRequest } from '../types';
+import { watchPlayers } from '../lib/players';
+import { FinanceTransaction, InvestmentCampaign, SalaryRequest, PlayerProfile } from '../types';
 import { Sidebar } from '../components/Sidebar';
 import { BalanceIndicator } from '../components/BalanceIndicator';
 import { 
@@ -40,6 +41,7 @@ export const Finance: React.FC = () => {
   const { user, isAdmin } = useAuth();
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [players, setPlayers] = useState<PlayerProfile[]>([]);
 
   // Quick form input states
   const [showLogModal, setShowLogModal] = useState(false);
@@ -82,10 +84,15 @@ export const Finance: React.FC = () => {
       setSalaryRequests(data);
     });
 
+    const unsubscribePlayers = watchPlayers((data) => {
+      setPlayers(data);
+    });
+
     return () => {
       unsubscribeTx();
       unsubscribeCampaigns();
       unsubscribeRequests();
+      unsubscribePlayers();
     };
   }, []);
 
@@ -265,6 +272,36 @@ export const Finance: React.FC = () => {
 
   const netHisab = totalProfit + totalInvest - totalSalary - totalWithdraw + totalCampaignWinnings - totalCampaignOutlay;
 
+  // Custom targets & daily metrics:
+  // 1. Sobar salary gula jog kore 30 diye vag hoye regular profit target
+  const totalSalarySum = players.reduce((sum, p) => sum + (p.salary || 0), 0);
+  const regularProfitTarget = totalSalarySum / 30;
+
+  // 2. Daily total profits (logged today)
+  const todayStr = new Date().toDateString();
+  const dailyDirectProfits = transactions
+    .filter(t => t.type === 'tournament_profit' && new Date(t.date).toDateString() === todayStr)
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const dailyCampaignProfits = campaigns
+    .filter(c => c.status === 'win' && c.resolvedAt && new Date(c.resolvedAt).toDateString() === todayStr)
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+
+  const dailyTotalProfits = dailyDirectProfits + dailyCampaignProfits;
+
+  // 3. Check if target is met & calculate remaining for next day if not met
+  const isTargetMet = dailyTotalProfits >= regularProfitTarget;
+  const remainingNeededForNextDay = isTargetMet ? 0 : (regularProfitTarget - dailyTotalProfits);
+
+  // 4. Lineup winnings
+  const firstLineupEarnings = campaigns
+    .filter(c => c.lineup === '1st Lineup' && c.status === 'win')
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+
+  const secondLineupEarnings = campaigns
+    .filter(c => c.lineup === 'second lineup' && c.status === 'win')
+    .reduce((sum, c) => sum + (c.prizeAmount || 0), 0);
+
   // Chart data mapping (reverse to show chronological order)
   const chartData = [...transactions].reverse().map((t, idx) => ({
     name: `Tx #${idx + 1}`,
@@ -318,6 +355,61 @@ export const Finance: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-8">
+            {/* Regular Profit Target Banner */}
+            <div className="bg-[#0b0b12] border border-purple-500/20 rounded-3xl p-6 relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/5 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 relative z-10">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded border border-purple-500/20 font-bold font-mono tracking-widest uppercase">
+                      ORGANIZATION TARGET MONITOR
+                    </span>
+                    {isTargetMet ? (
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-bold font-mono tracking-wider">
+                        ★ TARGET MET
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-bold font-mono tracking-wider">
+                        ⚠️ SHORTFALL
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                    Regular Profit Target Standing
+                  </h3>
+                  <p className="text-gray-400 text-xs max-w-xl leading-relaxed">
+                    The target is calculated as the sum of all player salaries divided by 30 days. Daily profits combine direct tournament winnings and resolved campaign payouts earned today.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 shrink-0 lg:border-l lg:border-white/5 lg:pl-8">
+                  <div>
+                    <span className="text-[9px] font-mono text-gray-500 uppercase block mb-1">Profit Target (Daily)</span>
+                    <span className="text-xl font-bold text-white font-mono">${regularProfitTarget.toFixed(2)}</span>
+                    <span className="text-[8px] text-gray-500 block mt-0.5 font-mono">Sum: ${totalSalarySum.toLocaleString()} / 30</span>
+                  </div>
+
+                  <div>
+                    <span className="text-[9px] font-mono text-gray-500 uppercase block mb-1">Daily Profits (Today)</span>
+                    <span className="text-xl font-bold text-emerald-400 font-mono">${dailyTotalProfits.toFixed(2)}</span>
+                    <span className="text-[8px] text-gray-500 block mt-0.5 font-mono">Logged today</span>
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1">
+                    <span className="text-[9px] font-mono text-gray-500 uppercase block mb-1">
+                      {isTargetMet ? 'Surplus Amount' : 'Remaining Needed'}
+                    </span>
+                    <span className={`text-xl font-black font-mono ${isTargetMet ? 'text-emerald-400' : 'text-amber-500'}`}>
+                      ${Math.abs(dailyTotalProfits - regularProfitTarget).toFixed(2)}
+                    </span>
+                    <span className="text-[8px] text-gray-500 block mt-0.5 font-mono">
+                      {isTargetMet ? 'Exceeded target!' : 'Needed for tomorrow'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Quick Metrics Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Total Investments */}
@@ -369,6 +461,35 @@ export const Finance: React.FC = () => {
                     </h3>
                   </div>
                   <Activity className="w-5 h-5 text-white" />
+                </div>
+              </div>
+            </div>
+
+            {/* Lineup Earnings Breakdown Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[#0c0c14] border border-emerald-500/10 rounded-2xl p-5 relative overflow-hidden flex justify-between items-center shadow-lg">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none"></div>
+                <div>
+                  <span className="text-[10px] font-mono text-emerald-400 uppercase font-black tracking-widest block mb-1">1st Lineup Earnings</span>
+                  <h4 className="text-base font-sans font-bold text-white uppercase">Division Prize Pool</h4>
+                  <p className="text-[10px] font-mono text-gray-400 mt-1">Sum of won tournament campaigns</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xl font-mono font-black text-emerald-400 block">${firstLineupEarnings.toLocaleString()}</span>
+                  <span className="text-[9px] font-mono text-gray-500 uppercase">Total winnings</span>
+                </div>
+              </div>
+
+              <div className="bg-[#0c0c14] border border-emerald-500/10 rounded-2xl p-5 relative overflow-hidden flex justify-between items-center shadow-lg">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none"></div>
+                <div>
+                  <span className="text-[10px] font-mono text-emerald-400 uppercase font-black tracking-widest block mb-1">Second Lineup Earnings</span>
+                  <h4 className="text-base font-sans font-bold text-white uppercase">Division Prize Pool</h4>
+                  <p className="text-[10px] font-mono text-gray-400 mt-1">Sum of won tournament campaigns</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-2xl font-mono font-black text-emerald-400 block">${secondLineupEarnings.toLocaleString()}</span>
+                  <span className="text-[9px] font-mono text-gray-500 uppercase">Total winnings</span>
                 </div>
               </div>
             </div>
