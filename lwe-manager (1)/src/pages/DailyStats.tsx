@@ -14,6 +14,8 @@ interface PlayerStatsInput {
   booyahs: number;
   kills: number;
   damage: number;
+  assists?: number;
+  healing?: number;
 }
 
 type StatsInputsState = Record<string, PlayerStatsInput>;
@@ -35,6 +37,8 @@ export const DailyStats: React.FC = () => {
     booyahs: number;
     kills: number;
     damage: number;
+    assists: number;
+    healing: number;
   } | null>(null);
 
   useEffect(() => {
@@ -90,7 +94,7 @@ export const DailyStats: React.FC = () => {
     setInputs(prev => ({
       ...prev,
       [playerId]: {
-        ...(prev[playerId] || { matches: 0, booyahs: 0, kills: 0, damage: 0 }),
+        ...(prev[playerId] || { matches: 0, booyahs: 0, kills: 0, damage: 0, assists: 0, healing: 0 }),
         [field]: Math.max(0, val)
       }
     }));
@@ -100,7 +104,7 @@ export const DailyStats: React.FC = () => {
     if (saving) return;
 
     const logsToSave = players.map(p => {
-      const stats = inputs[p.id] || { matches: 0, booyahs: 0, kills: 0, damage: 0 };
+      const stats = inputs[p.id] || { matches: 0, booyahs: 0, kills: 0, damage: 0, assists: 0, healing: 0 };
       return {
         playerId: p.id,
         playerName: p.name,
@@ -109,9 +113,11 @@ export const DailyStats: React.FC = () => {
         booyahs: stats.booyahs,
         kills: stats.kills,
         damage: stats.damage,
+        assists: stats.assists || 0,
+        healing: stats.healing || 0,
         addedBy: user?.name || 'Admin'
       };
-    }).filter(log => log.matches > 0 || log.booyahs > 0 || log.kills > 0 || log.damage > 0);
+    }).filter(log => log.matches > 0 || log.booyahs > 0 || log.kills > 0 || log.damage > 0 || log.assists > 0 || log.healing > 0);
 
     if (logsToSave.length === 0) {
       toast.error('Please enter performance stats (above 0) for at least one active player.');
@@ -145,6 +151,8 @@ export const DailyStats: React.FC = () => {
       booyahs: log.booyahs,
       kills: log.kills,
       damage: log.damage,
+      assists: log.assists || 0,
+      healing: log.healing || 0,
     });
   };
 
@@ -162,6 +170,8 @@ export const DailyStats: React.FC = () => {
         booyahs: Number(editForm.booyahs),
         kills: Number(editForm.kills),
         damage: Number(editForm.damage),
+        assists: Number(editForm.assists),
+        healing: Number(editForm.healing),
       });
 
       // Recalculate locally and sync
@@ -171,6 +181,8 @@ export const DailyStats: React.FC = () => {
         booyahs: Number(editForm.booyahs),
         kills: Number(editForm.kills),
         damage: Number(editForm.damage),
+        assists: Number(editForm.assists),
+        healing: Number(editForm.healing),
       } : l);
       const { performScoreSync } = await import('../lib/sync');
       await performScoreSync(players, updatedLogs);
@@ -269,15 +281,17 @@ export const DailyStats: React.FC = () => {
                     <tr className="border-b border-white/10 text-gray-500 uppercase font-mono tracking-widest text-[9px]">
                       <th className="py-3 px-4">Player Name</th>
                       <th className="py-3 px-4">Role</th>
-                      <th className="py-3 px-4 text-center w-28">Matches</th>
-                      <th className="py-3 px-4 text-center w-28">Booyahs</th>
-                      <th className="py-3 px-4 text-center w-28">Kills</th>
-                      <th className="py-3 px-4 text-center w-28">Damage</th>
+                      <th className="py-3 px-4 text-center w-24">Matches</th>
+                      <th className="py-3 px-4 text-center w-24">Booyahs</th>
+                      <th className="py-3 px-4 text-center w-24">Kills</th>
+                      <th className="py-3 px-4 text-center w-24">Damage</th>
+                      <th className="py-3 px-4 text-center w-24">Assists</th>
+                      <th className="py-3 px-4 text-center w-24">Healing</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 font-mono">
                     {players.map((player) => {
-                      const stats = inputs[player.id] || { matches: 0, booyahs: 0, kills: 0, damage: 0 };
+                      const stats = inputs[player.id] || { matches: 0, booyahs: 0, kills: 0, damage: 0, assists: 0, healing: 0 };
                       return (
                         <tr key={player.id} className="hover:bg-white/5 transition-colors">
                           <td className="py-4 px-4 font-sans font-bold text-white uppercase text-sm">
@@ -322,6 +336,26 @@ export const DailyStats: React.FC = () => {
                               min="0"
                               value={stats.damage || ''}
                               onChange={(e) => handleInputChange(player.id, 'damage', e.target.value)}
+                              placeholder="0"
+                              className="w-full text-center bg-[#050507] border border-white/10 focus:border-purple-500 rounded-lg py-2 px-3 text-white focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all font-mono"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <input
+                              type="number"
+                              min="0"
+                              value={stats.assists || ''}
+                              onChange={(e) => handleInputChange(player.id, 'assists', e.target.value)}
+                              placeholder="0"
+                              className="w-full text-center bg-[#050507] border border-white/10 focus:border-purple-500 rounded-lg py-2 px-3 text-white focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all font-mono"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <input
+                              type="number"
+                              min="0"
+                              value={stats.healing || ''}
+                              onChange={(e) => handleInputChange(player.id, 'healing', e.target.value)}
                               placeholder="0"
                               className="w-full text-center bg-[#050507] border border-white/10 focus:border-purple-500 rounded-lg py-2 px-3 text-white focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all font-mono"
                             />
@@ -466,6 +500,36 @@ export const DailyStats: React.FC = () => {
                                   />
                                 ) : (
                                   <span className="text-white font-bold">{log.damage}</span>
+                                )}
+                              </td>
+
+                              {/* Assists */}
+                              <td className="py-3 px-4 text-center">
+                                {isEditing && editForm ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={editForm.assists}
+                                    onChange={(e) => setEditForm({ ...editForm, assists: Math.max(0, parseInt(e.target.value) || 0) })}
+                                    className="w-16 text-center bg-[#050507] border border-white/10 focus:border-purple-500 rounded py-1 px-1.5 text-white text-xs font-mono"
+                                  />
+                                ) : (
+                                  <span className="text-white font-bold">{log.assists || 0}</span>
+                                )}
+                              </td>
+
+                              {/* Healing */}
+                              <td className="py-3 px-4 text-center">
+                                {isEditing && editForm ? (
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={editForm.healing}
+                                    onChange={(e) => setEditForm({ ...editForm, healing: Math.max(0, parseInt(e.target.value) || 0) })}
+                                    className="w-16 text-center bg-[#050507] border border-white/10 focus:border-purple-500 rounded py-1 px-1.5 text-white text-xs font-mono"
+                                  />
+                                ) : (
+                                  <span className="text-white font-bold">{log.healing || 0}</span>
                                 )}
                               </td>
 
