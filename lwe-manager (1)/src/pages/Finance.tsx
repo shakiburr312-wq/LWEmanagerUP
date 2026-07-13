@@ -73,6 +73,8 @@ export const Finance: React.FC = () => {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [prizeInput, setPrizeInput] = useState('');
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
+  const [campaignStartTime, setCampaignStartTime] = useState('');
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     const unsubscribeTx = watchFinanceTransactions((data) => {
@@ -96,14 +98,42 @@ export const Finance: React.FC = () => {
       setSiteSettings(data);
     });
 
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
     return () => {
       unsubscribeTx();
       unsubscribeCampaigns();
       unsubscribeRequests();
       unsubscribePlayers();
       unsubscribeSite();
+      clearInterval(interval);
     };
   }, []);
+
+  const getCountdownString = (startTimeStr?: string) => {
+    if (!startTimeStr) return '';
+    const matchTime = new Date(startTimeStr).getTime();
+    const diffMs = matchTime - now;
+
+    if (diffMs <= 0) {
+      return '⚔️ LIVE / ENDED';
+    }
+
+    const secs = Math.floor((diffMs / 1000) % 60);
+    const mins = Math.floor((diffMs / (1000 * 60)) % 60);
+    const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours.toString().padStart(2, '0')}h`);
+    parts.push(`${mins.toString().padStart(2, '0')}m`);
+    parts.push(`${secs.toString().padStart(2, '0')}s`);
+
+    return parts.join(' ');
+  };
 
   const handleLogTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +188,11 @@ export const Finance: React.FC = () => {
     setAddingCampaign(true);
     const toastId = toast.loading('Initiating investment campaign...');
     try {
+      let combinedStartTime = '';
+      if (campaignStartTime) {
+        combinedStartTime = new Date(`${campaignDate}T${campaignStartTime}`).toISOString();
+      }
+
       await addInvestmentCampaign(
         campaignTitle.trim(),
         campaignCategory,
@@ -165,11 +200,13 @@ export const Finance: React.FC = () => {
         campaignDate,
         user.name,
         campaignLineup,
-        user.uid
+        user.uid,
+        combinedStartTime || undefined
       );
       toast.success(`Started ${campaignCategory} campaign for ${campaignLineup} with $${amountNum} investment!`, { id: toastId });
       setCampaignTitle('');
       setCampaignAmount('100');
+      setCampaignStartTime('');
       setShowCampaignModal(false);
     } catch (err: any) {
       toast.error('Campaign creation failed: ' + err.message, { id: toastId });
@@ -822,6 +859,17 @@ export const Finance: React.FC = () => {
                                 </span>
                               </div>
 
+                              {c.startTime && (
+                                <div className="flex items-center justify-between bg-[#050507]/60 border border-purple-500/15 px-3 py-2 rounded-xl mt-1 text-[10px] font-mono text-amber-400">
+                                  <span className="flex items-center gap-1.5 text-gray-400 uppercase text-[8px] tracking-wider font-bold">
+                                    <Clock className="w-3.5 h-3.5 text-purple-400 animate-pulse" /> Countdown:
+                                  </span>
+                                  <span className="font-black font-mono tracking-tight text-amber-400">
+                                    {getCountdownString(c.startTime)}
+                                  </span>
+                                </div>
+                              )}
+
                               {isAdmin && (
                                 <div className="mt-1">
                                   {resolvingId === c.id ? (
@@ -1049,6 +1097,22 @@ export const Finance: React.FC = () => {
                     className="w-full bg-[#050507] border border-white/10 focus:border-emerald-500 rounded-xl py-2 px-3 text-sm text-white focus:outline-none"
                     required
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider block flex items-center justify-between">
+                    <span>Target Start Time</span>
+                    <span className="text-[8px] text-purple-400">Optional</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={campaignStartTime}
+                    onChange={(e) => setCampaignStartTime(e.target.value)}
+                    className="w-full bg-[#050507] border border-white/10 focus:border-emerald-500 rounded-xl py-2 px-3 text-sm text-white focus:outline-none font-mono"
+                  />
+                  <p className="text-[9px] text-gray-500 leading-normal mt-0.5 font-sans">
+                    If provided, players will see a real-time ticking countdown clock on active campaigns.
+                  </p>
                 </div>
 
                 <button
