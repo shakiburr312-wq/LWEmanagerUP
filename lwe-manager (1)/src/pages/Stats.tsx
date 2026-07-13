@@ -532,11 +532,12 @@ export const Stats: React.FC = () => {
           </div>
         )}
 
-        {mvp && (
+        {selectedMvpPlayer && (
           <MvpRevealModal 
             isOpen={isMvpModalOpen}
             onClose={() => setIsMvpModalOpen(false)}
-            mvp={mvp}
+            mvp={selectedMvpPlayer}
+            title={selectedMvpTitle}
           />
         )}
       </main>
