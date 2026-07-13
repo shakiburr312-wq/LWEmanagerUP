@@ -21,7 +21,8 @@ import {
   X,
   Home as HomeIcon,
   User as UserIcon,
-  History as HistoryIcon
+  History as HistoryIcon,
+  TrendingUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -115,6 +116,12 @@ export const Sidebar: React.FC = () => {
       name: 'Performance & MVP',
       path: '/stats',
       icon: Trophy,
+      show: true,
+    },
+    {
+      name: 'Match Campaigns',
+      path: '/campaigns',
+      icon: TrendingUp,
       show: true,
     },
     {
