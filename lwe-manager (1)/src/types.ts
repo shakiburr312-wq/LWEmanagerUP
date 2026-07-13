@@ -35,6 +35,8 @@ export interface PlayerProfile {
   lineupId?: string;
   isOnline?: boolean;
   lastActive?: string;
+  assists?: number;
+  healing?: number;
 }
 
 export interface Lineup {
@@ -120,6 +122,8 @@ export interface PerformanceLog {
   booyahs: number;
   kills: number;
   damage: number;
+  assists?: number;
+  healing?: number;
   addedBy: string;
 }
 
@@ -138,7 +142,7 @@ export interface InvestmentCampaign {
 
 export interface ChatMessage {
   id: string;
-  lineup: '1st Lineup' | 'second lineup';
+  lineup: string;
   senderId: string;
   senderName: string;
   senderRole?: string;
