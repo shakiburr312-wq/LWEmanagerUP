@@ -5,7 +5,9 @@ import {
   where, 
   orderBy, 
   limit, 
-  onSnapshot 
+  onSnapshot,
+  doc,
+  setDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { ChatMessage } from '../types';
@@ -127,4 +129,64 @@ export async function sendLineupChatMessage(
     console.warn("Firestore sendLineupChatMessage failed, message saved locally only:", error);
     return mockId;
   }
+}
+
+/**
+ * Update the user's typing status in Firestore
+ */
+export async function updateTypingStatus(
+  userId: string,
+  name: string,
+  lineup: string,
+  isTyping: boolean
+) {
+  try {
+    const typingRef = doc(db, 'typingStates', userId);
+    await setDoc(typingRef, {
+      userId,
+      name,
+      lineup,
+      isTyping,
+      lastUpdated: new Date().toISOString()
+    }, { merge: true });
+  } catch (error) {
+    console.warn("Firestore updateTypingStatus failed:", error);
+  }
+}
+
+/**
+ * Watch typing status of other players in the lineup
+ */
+export function watchLineupTyping(
+  lineup: string,
+  currentUserId: string,
+  callback: (usersTyping: string[]) => void
+) {
+  const q = query(
+    collection(db, 'typingStates'),
+    where('lineup', '==', lineup),
+    where('isTyping', '==', true)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const typingNames: string[] = [];
+      const now = Date.now();
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.userId !== currentUserId) {
+          // Safety check: only count as typing if updated in the last 12 seconds
+          const lastUpdated = data.lastUpdated ? new Date(data.lastUpdated).getTime() : 0;
+          if (now - lastUpdated < 12000) {
+            typingNames.push(data.name || 'Someone');
+          }
+        }
+      });
+      callback(typingNames);
+    },
+    (error) => {
+      console.warn("Firestore watchLineupTyping failed:", error);
+    }
+  );
 }
