@@ -96,35 +96,13 @@ export async function addInvestmentCampaign(
   const list: InvestmentCampaign[] = local ? JSON.parse(local) : [...DEFAULT_CAMPAIGNS];
   const mockId = 'campaign_local_' + Math.random().toString(36).substr(2, 9);
   
-  // If adminId is provided, also update local storage admin wallet
-  if (adminId) {
-    try {
-      const localPlayers = localStorage.getItem('lwe_players_fallback_v2');
-      if (localPlayers) {
-        const pList = JSON.parse(localPlayers);
-        const idx = pList.findIndex((p: any) => p.id === adminId);
-        if (idx !== -1) {
-          pList[idx].wallet = (pList[idx].wallet || 0) - amount;
-          localStorage.setItem('lwe_players_fallback_v2', JSON.stringify(pList));
-        }
-      }
-    } catch (e) {
-      console.warn("Local storage admin wallet deduct failed:", e);
-    }
-  }
-
+  // We do NOT modify admin's wallet for investments or prize winnings anymore as per user request: "admin er wallet e just admin er salary count korba onno kichu na.."
   list.unshift({ ...campaignData, id: mockId });
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
   notifyCampaignWatchers(list);
 
   try {
     const docRef = await addDoc(collection(db, CAMPAIGNS_COLLECTION), campaignData);
-    
-    // Deduct from Admin's wallet (central balance) in Firestore
-    if (adminId) {
-      await updatePlayerWallet(adminId, -amount);
-    }
-
     return docRef.id;
   } catch (error) {
     console.warn("Firestore addInvestmentCampaign failed, saved locally:", error);
@@ -155,22 +133,6 @@ export async function resolveInvestmentCampaign(
     }
   }
 
-  if (adminId && status === 'win' && prizeAmount !== undefined) {
-    try {
-      const localPlayers = localStorage.getItem('lwe_players_fallback_v2');
-      if (localPlayers) {
-        const pList = JSON.parse(localPlayers);
-        const idx = pList.findIndex((p: any) => p.id === adminId);
-        if (idx !== -1) {
-          pList[idx].wallet = (pList[idx].wallet || 0) + prizeAmount;
-          localStorage.setItem('lwe_players_fallback_v2', JSON.stringify(pList));
-        }
-      }
-    } catch (e) {
-      console.warn("Local storage admin wallet add prize failed:", e);
-    }
-  }
-
   const docRef = doc(db, CAMPAIGNS_COLLECTION, campaignId);
   const updateData: any = {
     status,
@@ -183,11 +145,6 @@ export async function resolveInvestmentCampaign(
 
   try {
     await updateDoc(docRef, updateData);
-
-    // If campaign is won and we have a prize, add to central balance (Admin's wallet)
-    if (status === 'win' && prizeAmount !== undefined && adminId) {
-      await updatePlayerWallet(adminId, prizeAmount);
-    }
   } catch (error) {
     console.warn("Firestore resolveInvestmentCampaign failed, updated locally only:", error);
   }
