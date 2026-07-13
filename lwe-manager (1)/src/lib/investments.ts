@@ -54,7 +54,9 @@ export function watchInvestmentCampaigns(callback: (campaigns: InvestmentCampaig
           prizeAmount: data.prizeAmount !== undefined ? Number(data.prizeAmount) : undefined,
           resolvedAt: data.resolvedAt || undefined,
           addedBy: data.addedBy || 'Admin',
-          lineup: data.lineup || '1st Lineup'
+          lineup: data.lineup || '1st Lineup',
+          startTime: data.startTime || undefined,
+          reminderSent: data.reminderSent || false
         });
       });
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(campaigns));
@@ -78,7 +80,8 @@ export async function addInvestmentCampaign(
   date: string,
   addedBy: string,
   lineup: '1st Lineup' | 'second lineup' = '1st Lineup',
-  adminId?: string
+  adminId?: string,
+  startTime?: string
 ) {
   const campaignData = {
     title,
@@ -88,6 +91,8 @@ export async function addInvestmentCampaign(
     status: 'active' as const,
     addedBy,
     lineup,
+    startTime: startTime || null,
+    reminderSent: false,
     createdAt: new Date().toISOString()
   };
 
@@ -97,7 +102,7 @@ export async function addInvestmentCampaign(
   const mockId = 'campaign_local_' + Math.random().toString(36).substr(2, 9);
   
   // We do NOT modify admin's wallet for investments or prize winnings anymore as per user request: "admin er wallet e just admin er salary count korba onno kichu na.."
-  list.unshift({ ...campaignData, id: mockId });
+  list.unshift({ ...campaignData, id: mockId, startTime: startTime || undefined });
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
   notifyCampaignWatchers(list);
 
@@ -107,6 +112,51 @@ export async function addInvestmentCampaign(
   } catch (error) {
     console.warn("Firestore addInvestmentCampaign failed, saved locally:", error);
     return mockId;
+  }
+}
+
+export async function updateCampaignTiming(campaignId: string, startTime: string) {
+  // Update local storage first
+  const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (local) {
+    const list: InvestmentCampaign[] = JSON.parse(local);
+    const index = list.findIndex(c => c.id === campaignId);
+    if (index !== -1) {
+      list[index] = {
+        ...list[index],
+        startTime,
+        reminderSent: false
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+      notifyCampaignWatchers(list);
+    }
+  }
+
+  if (!campaignId.startsWith('campaign_local_')) {
+    const docRef = doc(db, CAMPAIGNS_COLLECTION, campaignId);
+    await updateDoc(docRef, { startTime, reminderSent: false });
+  }
+}
+
+export async function updateCampaignReminder(campaignId: string, reminderSent: boolean) {
+  // Update local storage first
+  const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (local) {
+    const list: InvestmentCampaign[] = JSON.parse(local);
+    const index = list.findIndex(c => c.id === campaignId);
+    if (index !== -1) {
+      list[index] = {
+        ...list[index],
+        reminderSent
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+      notifyCampaignWatchers(list);
+    }
+  }
+
+  if (!campaignId.startsWith('campaign_local_')) {
+    const docRef = doc(db, CAMPAIGNS_COLLECTION, campaignId);
+    await updateDoc(docRef, { reminderSent });
   }
 }
 
