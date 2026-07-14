@@ -1020,7 +1020,7 @@ export const Finance: React.FC = () => {
         {/* Start Investment Campaign Modal */}
         {showCampaignModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-[#0c0c14] max-w-md w-full rounded-3xl border border-purple-500/20 p-6 shadow-2xl relative">
+            <div className="bg-[#0c0c14] max-w-md w-full max-h-[90vh] overflow-y-auto rounded-3xl border border-purple-500/20 p-6 shadow-2xl relative scrollbar-thin scrollbar-thumb-purple-900">
               <button 
                 onClick={() => setShowCampaignModal(false)}
                 className="absolute top-4 right-4 text-gray-400 hover:text-white transition-all cursor-pointer text-lg"
