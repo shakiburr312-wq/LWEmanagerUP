@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import emailjs from '@emailjs/browser';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   watchInvestmentCampaigns, 
@@ -149,8 +150,46 @@ export const MatchCampaigns: React.FC = () => {
     }
   };
 
-  const dispatchEmailWebhook = (camp: InvestmentCampaign, typeLabel: string) => {
-    console.log(`[EMAIL DISPATCHER] Sending email to ${camp.lineup || '1st Lineup'} players via Resend webhook. Campaign: ${camp.title}`);
+  const dispatchEmailWebhook = async (camp: InvestmentCampaign, typeLabel: string) => {
+    const serviceId = siteSettings.emailjsServiceId || 'service_6tdx97u';
+    const templateId = siteSettings.emailjsTemplateIdMatch || siteSettings.emailjsTemplateId || 'template_xeeyqwh';
+    const publicKey = siteSettings.emailjsPublicKey || '';
+
+    if (!publicKey) {
+      console.warn('[EMAIL DISPATCHER] Cannot send email because EmailJS Public Key is not configured in settings.');
+      toast.error('EmailJS Public Key সেটিংস এ কনফিগার করা নাই! পাবলিক কী ছাড়া ইমেইল পাঠানো যাবে না।', { id: 'emailjs-warn-pk' });
+      return;
+    }
+
+    const matchTimeFormatted = camp.startTime 
+      ? new Date(camp.startTime).toLocaleString('bn-BD', { 
+          timeZone: 'Asia/Dhaka',
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        })
+      : 'TBA';
+
+    // Passing multiple parameters so any naming scheme inside your template works perfectly
+    const templateParams = {
+      match_name: camp.title,
+      match_time: matchTimeFormatted,
+      match_title: camp.title,
+      match_date: camp.date,
+      lineup: camp.lineup || '1st Lineup',
+      category: camp.category,
+      type_label: typeLabel,
+    };
+
+    console.log(`[EMAIL DISPATCHER] Sending EmailJS notification. Service: ${serviceId}, Template: ${templateId}, Params:`, templateParams);
+
+    const toastId = toast.loading('ইমেইল পাঠানো হচ্ছে...');
+    try {
+      await emailjs.send(serviceId, templateId, templateParams, publicKey);
+      toast.success(`"${camp.title}" এর জন্য ইমেইল অ্যালার্ট সফলভাবে পাঠানো হয়েছে!`, { id: toastId });
+    } catch (err: any) {
+      console.error('[EMAIL DISPATCHER] EmailJS failed:', err);
+      toast.error(`ইমেইল পাঠাতে সমস্যা হয়েছে: ${err.text || err.message || err}`, { id: toastId });
+    }
   };
 
   // Helper to format remaining time
