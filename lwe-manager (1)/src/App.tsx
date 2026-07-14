@@ -16,6 +16,7 @@ import { DailyStats } from './pages/DailyStats';
 import { Profile } from './pages/Profile';
 import { PaymentHistory } from './pages/PaymentHistory';
 import { MatchCampaigns } from './pages/MatchCampaigns';
+import { Announcements } from './pages/Announcements';
 import { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -88,6 +89,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Chatbox />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/announcements" 
+            element={
+              <ProtectedRoute>
+                <Announcements />
               </ProtectedRoute>
             } 
           />
