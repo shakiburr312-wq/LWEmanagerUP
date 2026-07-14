@@ -47,6 +47,12 @@ export const SettingsPage: React.FC = () => {
   const [heroBanners, setHeroBanners] = useState<HeroBannerItem[]>([]);
   const [siteSaving, setSiteSaving] = useState(false);
 
+  // EmailJS configuration
+  const [emailjsServiceId, setEmailjsServiceId] = useState('service_6tdx97u');
+  const [emailjsTemplateIdMatch, setEmailjsTemplateIdMatch] = useState('template_xeeyqwh');
+  const [emailjsTemplateIdAnnounce, setEmailjsTemplateIdAnnounce] = useState('');
+  const [emailjsPublicKey, setEmailjsPublicKey] = useState('');
+
   // Form fields for adding/editing a banner
   const [newBannerTitle, setNewBannerTitle] = useState('');
   const [newBannerImageUrl, setNewBannerImageUrl] = useState('');
@@ -70,6 +76,10 @@ export const SettingsPage: React.FC = () => {
       setHeroImageUrl(data.heroImageUrl || '');
       setLogoUrl(data.logoUrl || '');
       setHeroBanners(data.heroBanners || []);
+      setEmailjsServiceId(data.emailjsServiceId || 'service_6tdx97u');
+      setEmailjsTemplateIdMatch(data.emailjsTemplateIdMatch || data.emailjsTemplateId || 'template_xeeyqwh');
+      setEmailjsTemplateIdAnnounce(data.emailjsTemplateIdAnnounce || '');
+      setEmailjsPublicKey(data.emailjsPublicKey || '');
     });
 
     const unsubLineups = watchLineups((data) => {
@@ -122,9 +132,14 @@ export const SettingsPage: React.FC = () => {
         heroSubtitle: heroSubtitle.trim(),
         heroImageUrl: heroImageUrl.trim(),
         logoUrl: logoUrl.trim(),
-        heroBanners
+        heroBanners,
+        emailjsServiceId: emailjsServiceId.trim(),
+        emailjsTemplateId: emailjsTemplateIdMatch.trim(), // fallback
+        emailjsTemplateIdMatch: emailjsTemplateIdMatch.trim(),
+        emailjsTemplateIdAnnounce: emailjsTemplateIdAnnounce.trim(),
+        emailjsPublicKey: emailjsPublicKey.trim()
       });
-      toast.success('Site branding configuration updated!', { id: toastId });
+      toast.success('Site branding and EmailJS configuration updated!', { id: toastId });
     } catch (err: any) {
       toast.error('Failed to save settings: ' + err.message, { id: toastId });
     } finally {
@@ -626,6 +641,85 @@ export const SettingsPage: React.FC = () => {
                       <img src={heroImageUrl} alt="Fallback Banner Preview" className="w-full h-full object-cover" />
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* --- EmailJS Notification Integration --- */}
+              <div className="border border-purple-500/20 bg-purple-950/5 rounded-2xl p-4.5 space-y-4">
+                <div className="border-b border-white/5 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-400 block font-mono flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    EmailJS Notification Credentials
+                  </span>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Configure EmailJS credentials to automatically dispatch match reminders containing match names and match times.
+                  </p>
+                </div>
+
+                {/* EmailJS Service ID */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono block">
+                    EmailJS Service ID
+                  </label>
+                  <input
+                    type="text"
+                    value={emailjsServiceId}
+                    onChange={(e) => setEmailjsServiceId(e.target.value)}
+                    placeholder="e.g., service_6tdx97u"
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2 px-3 text-xs text-white focus:outline-none transition-colors font-mono"
+                  />
+                </div>
+
+                {/* EmailJS Match Campaign Template ID */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono block">
+                    Match Reminder Template ID
+                  </label>
+                  <input
+                    type="text"
+                    value={emailjsTemplateIdMatch}
+                    onChange={(e) => setEmailjsTemplateIdMatch(e.target.value)}
+                    placeholder="e.g., template_xeeyqwh"
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2 px-3 text-xs text-white focus:outline-none transition-colors font-mono"
+                  />
+                  <p className="text-[8.5px] text-gray-500 leading-normal font-sans">
+                    Used to notify players about upcoming tournaments and lineups.
+                  </p>
+                </div>
+
+                {/* EmailJS Announcement Template ID */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono block">
+                    Announcement Board Template ID
+                  </label>
+                  <input
+                    type="text"
+                    value={emailjsTemplateIdAnnounce}
+                    onChange={(e) => setEmailjsTemplateIdAnnounce(e.target.value)}
+                    placeholder="e.g., template_announcements"
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2 px-3 text-xs text-white focus:outline-none transition-colors font-mono"
+                  />
+                  <p className="text-[8.5px] text-gray-500 leading-normal font-sans">
+                    Used to broadcast offical notices and custom broadcast updates.
+                  </p>
+                </div>
+
+                {/* EmailJS Public Key */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 font-mono block flex items-center justify-between">
+                    <span>EmailJS Public Key (User ID)</span>
+                    <span className="text-[8px] text-amber-500 font-bold uppercase">Required</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={emailjsPublicKey}
+                    onChange={(e) => setEmailjsPublicKey(e.target.value)}
+                    placeholder="Enter your EmailJS Public Key (from Account Settings)"
+                    className="w-full bg-[#050507] border border-white/10 focus:border-purple-500 rounded-xl py-2 px-3 text-xs text-white focus:outline-none transition-colors font-mono"
+                  />
+                  <p className="text-[8.5px] text-gray-500 leading-normal font-sans">
+                    Required to authenticate and send emails. Retrieve this from your EmailJS dashboard under Account Settings / Public Key.
+                  </p>
                 </div>
               </div>
 
