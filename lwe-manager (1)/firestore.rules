@@ -42,7 +42,7 @@ service cloud.firestore {
 
     // Users Collection rules
     match /users/{uid} {
-      allow read: if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(uid) && (
                       (request.resource.data.role == 'player' && request.resource.data.status == 'pending') ||
                       (request.resource.data.email == 'chfpoint@gmail.com' && request.resource.data.role == 'admin' && request.resource.data.status == 'active')
@@ -137,6 +137,12 @@ service cloud.firestore {
     match /typingStates/{uid} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && uid == request.auth.uid;
+    }
+
+    // Announcements Collection
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }
