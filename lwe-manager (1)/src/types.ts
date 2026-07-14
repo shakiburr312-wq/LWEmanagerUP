@@ -64,6 +64,11 @@ export interface SiteSettings {
   archivedCampaignOutlay?: number;
   archived1stLineupWinnings?: number;
   archivedSecondLineupWinnings?: number;
+  emailjsServiceId?: string;
+  emailjsTemplateId?: string; // fallback / default
+  emailjsTemplateIdMatch?: string;
+  emailjsTemplateIdAnnounce?: string;
+  emailjsPublicKey?: string;
 }
 
 export interface SalaryTransaction {
@@ -158,4 +163,15 @@ export interface ChatMessage {
   message: string;
   timestamp: string;
 }
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  createdBy: string;
+  createdAt: string;
+  emailSent?: boolean;
+  recipientsCount?: number;
+}
+
 
