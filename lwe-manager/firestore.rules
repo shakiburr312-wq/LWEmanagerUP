@@ -1,0 +1,153 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'chfpoint@gmail.com' || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          getUserData().role == 'admin'
+        )
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isPlayerOwner(playerId, existingData) {
+      return isSignedIn() && (
+        request.auth.uid == playerId || 
+        (existingData != null && 'userId' in existingData && existingData.userId == request.auth.uid)
+      );
+    }
+
+    // Users Collection rules
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(uid) && (
+                      (request.resource.data.role == 'player' && request.resource.data.status == 'pending') ||
+                      (request.resource.data.email == 'chfpoint@gmail.com' && request.resource.data.role == 'admin' && request.resource.data.status == 'active')
+                    );
+      allow update: if isAdmin() || (
+                      isOwner(uid) && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'ign', 'passwordChanged'])
+                    );
+      allow delete: if false;
+    }
+
+    // Players collection rules (roster)
+    match /players/{playerId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (
+                      isSignedIn() && 
+                      playerId == request.auth.uid
+                    );
+      allow delete: if isAdmin();
+      allow update: if isAdmin() || (
+                      isPlayerOwner(playerId, resource.data) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photoUrl', 'mvpPhotoUrl', 'isOnline', 'lastActive'])
+                    );
+    }
+
+    // Lineups collection rules
+    match /lineups/{lineupId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Warning Logs
+    match /warningLogs/{logId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Salary Transactions
+    match /salaryTransactions/{txId} {
+      allow read: if isSignedIn() && (resource.data.playerId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Finance Transactions
+    match /financeTransactions/{txId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Investment Campaigns
+    match /investmentCampaigns/{campaignId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Complaints collection
+    match /complaints/{complaintId} {
+      allow read: if isSignedIn() && (resource.data.playerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.playerId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Settings Collection
+    match /settings/{settingsId} {
+      allow read: if isSignedIn() || settingsId == 'site';
+      allow write: if isAdmin();
+    }
+
+    // Lineup Chats collection
+    match /lineupChats/{chatId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Performance Logs Collection
+    match /performanceLogs/{logId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Salary Requests Collection
+    match /salaryRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.playerId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Typing States Collection
+    match /typingStates/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && uid == request.auth.uid;
+    }
+
+    // Announcements Collection
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Password Resets Collection rules
+    match /passwordResets/{resetId} {
+      allow read, create, update: if true; // anyone can request and verify a password reset
+      allow delete: if isAdmin();
+    }
+  }
+}

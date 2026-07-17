@@ -1,0 +1,121 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered app user and credentials reference",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "player"] },
+        "status": { "type": "string", "enum": ["pending", "active", "banned", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role", "status"]
+    },
+    "PlayerProfile": {
+      "title": "PlayerProfile",
+      "description": "Active in-game stats, role, cumulative earnings, and team warnings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive", "banned"] },
+        "kd": { "type": "number" },
+        "kills": { "type": "number" },
+        "damage": { "type": "number" },
+        "salary": { "type": "number" },
+        "warnings": { "type": "number" },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "role", "status", "kd", "kills", "damage", "salary", "warnings"]
+    },
+    "SalaryTransaction": {
+      "title": "SalaryTransaction",
+      "description": "Log of individual payouts made to players",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "playerId": { "type": "string" },
+        "playerName": { "type": "string" },
+        "amount": { "type": "number" },
+        "reason": { "type": "string" },
+        "addedBy": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["playerId", "playerName", "amount", "reason", "addedBy", "date"]
+    },
+    "FinanceTransaction": {
+      "title": "FinanceTransaction",
+      "description": "Unified financial statement ledger log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["invest", "tournament_profit", "salary_payment"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "addedBy": { "type": "string" }
+      },
+      "required": ["type", "amount", "description", "date", "addedBy"]
+    },
+    "Complaint": {
+      "title": "Complaint",
+      "description": "Support feedback and grievances tickets logged by players",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "playerId": { "type": "string" },
+        "playerName": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "resolved"] },
+        "reply": { "type": "string" },
+        "replyBy": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "repliedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["playerId", "playerName", "subject", "message", "status", "date"]
+    },
+    "MVPSettings": {
+      "title": "MVPSettings",
+      "description": "Weights for calculation of MVP in-game stats",
+      "type": "object",
+      "properties": {
+        "kdWeight": { "type": "number" },
+        "killsWeight": { "type": "number" },
+        "damageWeight": { "type": "number" }
+      },
+      "required": ["kdWeight", "killsWeight", "damageWeight"]
+    }
+  },
+  "firestore": {
+    "users/{uid}": {
+      "schema": "User",
+      "description": "Credential profiles for admins and players"
+    },
+    "players/{playerId}": {
+      "schema": "PlayerProfile",
+      "description": "Roster statistics and warnings log"
+    },
+    "salaryTransactions/{id}": {
+      "schema": "SalaryTransaction",
+      "description": "Historical salary stipends paid to players"
+    },
+    "financeTransactions/{id}": {
+      "schema": "FinanceTransaction",
+      "description": "Central ledger for net cash analytics"
+    },
+    "complaints/{id}": {
+      "schema": "Complaint",
+      "description": "Grievance feedback ticket logs"
+    },
+    "settings/mvp": {
+      "schema": "MVPSettings",
+      "description": "Customizable MVP calculation criteria weights"
+    }
+  }
+}
