@@ -1,6 +1,0 @@
-{
-  "name": "LWE Manager",
-  "description": "An Esports Organization and Team Management Dashboard for LWE Esports, tracking players, stats, earnings, and schedules.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
