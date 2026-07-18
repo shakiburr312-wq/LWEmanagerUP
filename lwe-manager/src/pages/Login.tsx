@@ -95,7 +95,21 @@ export const Login: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Server error sending email');
+        if (response.status === 404) {
+          throw new Error(errorData.error || "No player account found with this email address.");
+        }
+
+        console.warn('Custom email delivery failed, falling back to Firebase Native Password Reset:', errorData);
+        toast.loading('Mail gateway busy. Falling back to official secure recovery link...', { id: toastId });
+
+        // Trigger official Firebase client-side password reset email
+        await sendPasswordResetEmail(auth, forgotEmail.toLowerCase().trim());
+
+        toast.success('Official secure recovery link has been sent directly to your email by Google! Please check your inbox and spam folder.', { id: toastId, duration: 12000 });
+        setIsForgot(false);
+        setForgotStage('request');
+        setForgotEmail('');
+        return;
       }
 
       const resData = await response.json().catch(() => ({}));
