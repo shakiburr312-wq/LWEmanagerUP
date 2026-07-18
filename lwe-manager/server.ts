@@ -74,6 +74,63 @@ async function readFromFirestoreREST(docId: string) {
   return null;
 }
 
+async function verifyIdTokenREST(token: string) {
+  const config = getFirebaseConfig();
+  try {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${config.apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: token })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[SERVER REST] Token verification via REST failed:", errText);
+      return null;
+    }
+    const data = await res.json();
+    if (data && data.users && data.users[0]) {
+      const user = data.users[0];
+      return {
+        uid: user.localId,
+        email: user.email,
+        email_verified: user.emailVerified
+      };
+    }
+  } catch (err: any) {
+    console.error("[SERVER REST] verifyIdTokenREST error:", err.message);
+  }
+  return null;
+}
+
+async function readUserDocREST(uid: string) {
+  const config = getFirebaseConfig();
+  const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/users/${encodeURIComponent(uid)}?key=${config.apiKey}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      return null;
+    }
+    const json = await res.json();
+    if (json && json.fields) {
+      const result: any = {};
+      for (const [key, valObj] of Object.entries(json.fields)) {
+        if (valObj && typeof valObj === 'object') {
+          const vObj = valObj as any;
+          if ('stringValue' in vObj) {
+            result[key] = vObj.stringValue;
+          } else if ('booleanValue' in vObj) {
+            result[key] = vObj.booleanValue;
+          }
+        }
+      }
+      return result;
+    }
+  } catch (err: any) {
+    console.error("[SERVER REST] Failed to read user doc via REST:", err.message);
+  }
+  return null;
+}
+
 // Initialize Firebase Admin SDK
 try {
   const saPath = path.join(process.cwd(), "firebase-service-account.json");
@@ -521,7 +578,19 @@ async function startServer() {
     }
     const token = authHeader.split("Bearer ")[1];
     try {
-      const decodedToken = await getAuth().verifyIdToken(token);
+      let decodedToken: any = null;
+      try {
+        decodedToken = await getAuth().verifyIdToken(token);
+      } catch (adminErr: any) {
+        console.warn("[SERVER AUTH] Admin SDK verifyIdToken failed, trying REST API fallback...", adminErr.message);
+        const restUser = await verifyIdTokenREST(token);
+        if (restUser) {
+          decodedToken = restUser;
+        } else {
+          throw adminErr;
+        }
+      }
+
       const email = decodedToken.email;
       const uid = decodedToken.uid;
 
@@ -531,9 +600,22 @@ async function startServer() {
       }
 
       // Check role in users collection in Firestore
-      const dbAdmin = getFirestore();
-      const userDoc = await dbAdmin.collection("users").doc(uid).get();
-      if (userDoc.exists && userDoc.data()?.role === "admin") {
+      let isAdminRole = false;
+      try {
+        const dbAdmin = getFirestore();
+        const userDoc = await dbAdmin.collection("users").doc(uid).get();
+        if (userDoc.exists && userDoc.data()?.role === "admin") {
+          isAdminRole = true;
+        }
+      } catch (dbErr: any) {
+        console.warn("[SERVER AUTH] Failed to check admin role using Admin Firestore SDK, trying REST API read fallback...", dbErr.message);
+        const userDocRest = await readUserDocREST(uid);
+        if (userDocRest && userDocRest.role === "admin") {
+          isAdminRole = true;
+        }
+      }
+
+      if (isAdminRole) {
         (req as any).user = decodedToken;
         return next();
       }
