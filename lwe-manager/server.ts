@@ -547,23 +547,26 @@ async function startServer() {
       const saPath = path.join(process.cwd(), "firebase-service-account.json");
       fs.writeFileSync(saPath, JSON.stringify(parsed, null, 2), "utf8");
 
-      console.log("[SERVER] Successfully saved firebase-service-account.json. Attempting Admin SDK re-initialization...");
+      console.log("[SERVER] Successfully saved firebase-service-account.json. Re-initializing Admin SDK in background...");
 
-      try {
-        const apps = getApps();
-        if (apps.length > 0) {
-          await Promise.all(apps.map((app: any) => app?.delete()));
+      // Re-initialize in background to avoid killing active connections or aborting the current request
+      setTimeout(async () => {
+        try {
+          const apps = getApps();
+          if (apps.length > 0) {
+            await Promise.all(apps.map((app: any) => app?.delete()));
+          }
+          initializeApp({
+            credential: cert(parsed),
+            projectId: parsed.project_id
+          });
+          console.log("[SERVER] Firebase Admin SDK re-initialized successfully in background!");
+        } catch (reInitErr: any) {
+          console.error("[SERVER] Failed to re-initialize Admin SDK in background:", reInitErr.message);
         }
-        initializeApp({
-          credential: cert(parsed),
-          projectId: parsed.project_id
-        });
-        console.log("[SERVER] Firebase Admin SDK re-initialized successfully with updated service account!");
-      } catch (reInitErr: any) {
-        console.error("[SERVER] Failed to re-initialize Admin SDK:", reInitErr.message);
-      }
+      }, 500);
 
-      return res.json({ success: true, message: "Service account saved and Firebase Admin SDK re-initialized successfully!" });
+      return res.json({ success: true, message: "Service account saved and Firebase Admin SDK is re-initializing in the background!" });
     } catch (error: any) {
       console.error("[SERVER] Service account save endpoint error:", error);
       return res.status(500).json({ error: error.message });
