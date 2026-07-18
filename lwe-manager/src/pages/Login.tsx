@@ -81,35 +81,55 @@ export const Login: React.FC = () => {
 
     try {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      let useFallback = false;
 
-      const response = await fetch('/api/forgot-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: forgotEmail.toLowerCase().trim(),
-          otp: otp
-        })
-      });
+      try {
+        const response = await fetch('/api/forgot-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: forgotEmail.toLowerCase().trim(),
+            otp: otp
+          })
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Server error sending email');
+        if (!response.ok) {
+          // If 404 or 405, it means backend server endpoints are unconfigured/unsupported in this environment (e.g., hosted statically on Vercel)
+          if (response.status === 404 || response.status === 405) {
+            useFallback = true;
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Server error ${response.status}`);
+          }
+        } else {
+          const resData = await response.json().catch(() => ({}));
+          if (resData.mode === 'firebase') {
+            toast.success('Firebase has sent an official password reset link directly to your email! Please follow that link to reset your password, then return here to log in.', { id: toastId, duration: 12000 });
+            setIsForgot(false);
+            setForgotStage('request');
+            setForgotEmail('');
+          } else {
+            toast.success('A secure verification OTP and password reset link have been sent to your email! Please check your inbox.', { id: toastId, duration: 8000 });
+            setForgotStage('verify');
+          }
+        }
+      } catch (fetchErr: any) {
+        console.warn("API password reset request failed, falling back to standard Firebase Auth reset link:", fetchErr);
+        useFallback = true;
       }
 
-      const resData = await response.json().catch(() => ({}));
-      if (resData.mode === 'firebase') {
-        toast.success('Firebase has sent an official password reset link directly to your email! Please follow that link to reset your password, then return here to log in.', { id: toastId, duration: 12000 });
+      if (useFallback) {
+        // Fallback directly to native client-side Firebase Auth password reset email
+        await sendPasswordResetEmail(auth, forgotEmail.toLowerCase().trim());
+        toast.success('Official Firebase password reset email sent directly to your inbox! Please follow the link in that email to reset your password.', { id: toastId, duration: 12000 });
         setIsForgot(false);
         setForgotStage('request');
         setForgotEmail('');
-      } else {
-        toast.success('A secure verification OTP and password reset link have been sent to your email! Please check your inbox.', { id: toastId, duration: 8000 });
-        setForgotStage('verify');
       }
     } catch (err: any) {
-      toast.error('Failed to send verification OTP: ' + err.message, { id: toastId });
+      toast.error('Failed to send reset link: ' + err.message, { id: toastId });
     } finally {
       setLoading(false);
     }
