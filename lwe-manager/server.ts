@@ -133,14 +133,38 @@ async function readUserDocREST(uid: string) {
 
 // Initialize Firebase Admin SDK
 try {
-  const saPath = path.join(process.cwd(), "firebase-service-account.json");
-  if (fs.existsSync(saPath)) {
-    const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
+  let serviceAccount: any = null;
+  let initSource = "";
+
+  // 1. Try loading from Environment Variable first (Highly secure and persistent)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      initSource = "environment variable (FIREBASE_SERVICE_ACCOUNT)";
+    } catch (envErr: any) {
+      console.error("[SERVER] Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable JSON:", envErr.message);
+    }
+  }
+
+  // 2. Fall back to local file if environment variable not set or invalid
+  if (!serviceAccount) {
+    const saPath = path.join(process.cwd(), "firebase-service-account.json");
+    if (fs.existsSync(saPath)) {
+      try {
+        serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf8"));
+        initSource = "firebase-service-account.json file";
+      } catch (fileErr: any) {
+        console.error("[SERVER] Failed to parse firebase-service-account.json file:", fileErr.message);
+      }
+    }
+  }
+
+  if (serviceAccount) {
     initializeApp({
       credential: cert(serviceAccount),
-      projectId: "lwemanager-75ee0"
+      projectId: serviceAccount.project_id || "lwemanager-75ee0"
     });
-    console.log("[SERVER] Firebase Admin SDK initialized successfully using Service Account key file");
+    console.log(`[SERVER] Firebase Admin SDK initialized successfully using Service Account key from ${initSource}`);
   } else {
     initializeApp({
       projectId: "lwemanager-75ee0"
@@ -511,15 +535,33 @@ async function startServer() {
   app.get("/api/admin/service-account/status", checkAdmin, (req, res) => {
     try {
       const saPath = path.join(process.cwd(), "firebase-service-account.json");
-      const exists = fs.existsSync(saPath);
+      const fileExists = fs.existsSync(saPath);
+      const envExists = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+      
+      let exists = fileExists || envExists;
       let projectId = "Unknown";
-      if (exists) {
+      let source = "Not Configured";
+      
+      if (envExists) {
+        try {
+          const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || "{}");
+          projectId = sa.project_id || "Loaded (EnvVar)";
+          source = "Environment Variable (FIREBASE_SERVICE_ACCOUNT)";
+        } catch (e) {
+          projectId = "Error Parsing Env JSON";
+          source = "Environment Variable (Invalid JSON)";
+        }
+      } else if (fileExists) {
         try {
           const sa = JSON.parse(fs.readFileSync(saPath, "utf8"));
-          projectId = sa.project_id || "Loaded";
-        } catch (e) {}
+          projectId = sa.project_id || "Loaded (File)";
+          source = "Local File (firebase-service-account.json)";
+        } catch (e) {
+          projectId = "Error Parsing File JSON";
+          source = "Local File (Invalid JSON)";
+        }
       }
-      return res.json({ exists, projectId });
+      return res.json({ exists, projectId, source });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
