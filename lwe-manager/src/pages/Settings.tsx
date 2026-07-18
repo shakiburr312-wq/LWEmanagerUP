@@ -138,9 +138,14 @@ export const SettingsPage: React.FC = () => {
         }
       });
       if (res.ok) {
-        const data = await res.json();
-        setSaExists(data.exists);
-        setSaProjectId(data.projectId);
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          setSaExists(data.exists);
+          setSaProjectId(data.projectId);
+        } else {
+          console.warn('Load service account status got non-JSON response');
+        }
       }
     } catch (e) {
       console.error('Failed to load Service Account status:', e);
@@ -178,7 +183,17 @@ export const SettingsPage: React.FC = () => {
         body: JSON.stringify({ serviceAccountJson: saInput })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(text || `Request failed with status ${res.status}`);
+        }
+      }
+
       if (!res.ok) {
         throw new Error(data.error || 'Failed to save service account');
       }
@@ -187,7 +202,7 @@ export const SettingsPage: React.FC = () => {
       setSaInput('');
       fetchSaStatus();
     } catch (err: any) {
-      toast.error(err.message, { id: toastId });
+      toast.error(err.message || 'An unexpected error occurred', { id: toastId });
     } finally {
       setSaSaving(false);
     }
