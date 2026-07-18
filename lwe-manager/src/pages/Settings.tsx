@@ -144,8 +144,16 @@ export const SettingsPage: React.FC = () => {
           setSaExists(data.exists);
           setSaProjectId(data.projectId);
         } else {
-          console.warn('Load service account status got non-JSON response');
+          const text = await res.clone().text();
+          if (text.includes('<!DOCTYPE html>') || text.includes('<html>') || text.includes('<html')) {
+            console.log('Backend server is currently starting up or reloading. Retrying status check once available...');
+          } else {
+            console.warn('Load service account status got non-JSON response. Status:', res.status, 'Content-Type:', contentType, 'Body:', text.substring(0, 300));
+          }
         }
+      } else {
+        const text = await res.clone().text();
+        console.error('Load service account status failed. Status:', res.status, 'Body:', text.substring(0, 300));
       }
     } catch (e) {
       console.error('Failed to load Service Account status:', e);
@@ -185,12 +193,19 @@ export const SettingsPage: React.FC = () => {
 
       let data: any = {};
       const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
+      const isJson = contentType && contentType.includes('application/json');
+      
+      if (isJson) {
         data = await res.json();
       } else {
         const text = await res.text();
+        console.error('Save service account response is not JSON:', {
+          status: res.status,
+          contentType,
+          body: text
+        });
         if (!res.ok) {
-          throw new Error(text || `Request failed with status ${res.status}`);
+          throw new Error(`Server returned status ${res.status} (non-JSON response). Please check developer console logs for full response.`);
         }
       }
 
