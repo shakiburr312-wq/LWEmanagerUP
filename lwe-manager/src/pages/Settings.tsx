@@ -70,6 +70,63 @@ export const SettingsPage: React.FC = () => {
   const [saProjectId, setSaProjectId] = useState('');
   const [saInput, setSaInput] = useState('');
   const [saSaving, setSaSaving] = useState(false);
+  const [isDraggingSa, setIsDraggingSa] = useState(false);
+
+  const handleSaFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target?.result as string;
+          // Validate JSON structure
+          const parsed = JSON.parse(content);
+          if (!parsed.project_id || !parsed.private_key) {
+            toast.error('Invalid service account JSON: Missing project_id or private_key fields.');
+            return;
+          }
+          setSaInput(JSON.stringify(parsed, null, 2));
+          toast.success('Service account JSON loaded from file successfully! Click "Save & Re-initialize SDK" below to complete.');
+        } catch (err: any) {
+          toast.error('Invalid JSON file format: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleSaDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingSa(true);
+  };
+
+  const handleSaDragLeave = () => {
+    setIsDraggingSa(false);
+  };
+
+  const handleSaDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingSa(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target?.result as string;
+          const parsed = JSON.parse(content);
+          if (!parsed.project_id || !parsed.private_key) {
+            toast.error('Invalid service account JSON: Missing project_id or private_key.');
+            return;
+          }
+          setSaInput(JSON.stringify(parsed, null, 2));
+          toast.success('Service account JSON dropped and loaded successfully!');
+        } catch (err: any) {
+          toast.error('Invalid JSON file format: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
 
   const fetchSaStatus = async () => {
     if (!firebaseUser) return;
@@ -81,9 +138,9 @@ export const SettingsPage: React.FC = () => {
         }
       });
       if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setSaExists(!!data.exists);
-        setSaProjectId(data.projectId || '');
+        const data = await res.json();
+        setSaExists(data.exists);
+        setSaProjectId(data.projectId);
       }
     } catch (e) {
       console.error('Failed to load Service Account status:', e);
@@ -121,25 +178,12 @@ export const SettingsPage: React.FC = () => {
         body: JSON.stringify({ serviceAccountJson: saInput })
       });
 
-      let errorMsg = '';
-      let data: any = {};
-      try {
-        const text = await res.text();
-        try {
-          data = JSON.parse(text);
-          errorMsg = data?.error || data?.message || `Error ${res.status}: ${res.statusText}`;
-        } catch {
-          errorMsg = text || `Error ${res.status}: ${res.statusText}`;
-        }
-      } catch (e) {
-        errorMsg = `Error ${res.status}: ${res.statusText}`;
-      }
-
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error(errorMsg);
+        throw new Error(data.error || 'Failed to save service account');
       }
 
-      toast.success(data?.message || 'Credentials updated successfully!', { id: toastId });
+      toast.success(data.message || 'Credentials updated successfully!', { id: toastId });
       setSaInput('');
       fetchSaStatus();
     } catch (err: any) {
@@ -924,13 +968,41 @@ export const SettingsPage: React.FC = () => {
               </div>
 
               <form onSubmit={handleSaveSa} className="space-y-4">
+                {/* Drag and Drop File Upload Area */}
+                <div 
+                  onDragOver={handleSaDragOver}
+                  onDragLeave={handleSaDragLeave}
+                  onDrop={handleSaDrop}
+                  className={`border border-dashed rounded-2xl p-4 text-center transition-all cursor-pointer ${
+                    isDraggingSa 
+                      ? 'border-purple-500 bg-purple-500/10' 
+                      : 'border-white/10 hover:border-purple-500/50 bg-[#050507]/40'
+                  }`}
+                >
+                  <label className="cursor-pointer block space-y-2">
+                    <Upload className="w-6 h-6 text-purple-400 mx-auto animate-bounce" />
+                    <span className="text-xs font-semibold text-gray-300 block">
+                      Drag & Drop Firebase Service Account JSON file here
+                    </span>
+                    <span className="text-[10px] text-gray-500 block">
+                      Or <span className="text-purple-400 font-bold underline">click to browse</span> from your device
+                    </span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleSaFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-mono uppercase text-gray-400 block font-bold">Paste Service Account JSON:</label>
+                  <label className="text-[10px] font-mono uppercase text-gray-400 block font-bold">Service Account JSON Content:</label>
                   <textarea
                     placeholder='{"type": "service_account", "project_id": "lwemanager-75ee0", ...}'
                     value={saInput}
                     onChange={(e) => setSaInput(e.target.value)}
-                    className="w-full bg-[#050507] text-[10px] font-mono text-gray-400 border border-white/10 rounded-xl p-3 h-32 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
+                    className="w-full bg-[#050507] text-[10px] font-mono text-gray-300 border border-white/10 rounded-xl p-3 h-32 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all resize-y"
                   />
                   <p className="text-[9px] font-mono text-gray-500">
                     ⚠️ Keep this JSON safe. It is stored securely on the isolated server container and ignored by git.
