@@ -81,9 +81,9 @@ export const SettingsPage: React.FC = () => {
         }
       });
       if (res.ok) {
-        const data = await res.json();
-        setSaExists(data.exists);
-        setSaProjectId(data.projectId);
+        const data = await res.json().catch(() => ({}));
+        setSaExists(!!data.exists);
+        setSaProjectId(data.projectId || '');
       }
     } catch (e) {
       console.error('Failed to load Service Account status:', e);
@@ -121,12 +121,12 @@ export const SettingsPage: React.FC = () => {
         body: JSON.stringify({ serviceAccountJson: saInput })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to save service account');
+        throw new Error(data?.error || 'Failed to save service account');
       }
 
-      toast.success(data.message || 'Credentials updated successfully!', { id: toastId });
+      toast.success(data?.message || 'Credentials updated successfully!', { id: toastId });
       setSaInput('');
       fetchSaStatus();
     } catch (err: any) {
