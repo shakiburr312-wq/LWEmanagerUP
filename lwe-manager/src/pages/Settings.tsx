@@ -121,9 +121,22 @@ export const SettingsPage: React.FC = () => {
         body: JSON.stringify({ serviceAccountJson: saInput })
       });
 
-      const data = await res.json().catch(() => ({}));
+      let errorMsg = '';
+      let data: any = {};
+      try {
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+          errorMsg = data?.error || data?.message || `Error ${res.status}: ${res.statusText}`;
+        } catch {
+          errorMsg = text || `Error ${res.status}: ${res.statusText}`;
+        }
+      } catch (e) {
+        errorMsg = `Error ${res.status}: ${res.statusText}`;
+      }
+
       if (!res.ok) {
-        throw new Error(data?.error || 'Failed to save service account');
+        throw new Error(errorMsg);
       }
 
       toast.success(data?.message || 'Credentials updated successfully!', { id: toastId });
