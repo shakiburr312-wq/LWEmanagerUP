@@ -68,6 +68,7 @@ export const SettingsPage: React.FC = () => {
   // Service Account Status
   const [saExists, setSaExists] = useState(false);
   const [saProjectId, setSaProjectId] = useState('');
+  const [saSource, setSaSource] = useState('');
   const [saInput, setSaInput] = useState('');
   const [saSaving, setSaSaving] = useState(false);
   const [isDraggingSa, setIsDraggingSa] = useState(false);
@@ -143,6 +144,7 @@ export const SettingsPage: React.FC = () => {
           const data = await res.json();
           setSaExists(data.exists);
           setSaProjectId(data.projectId);
+          setSaSource(data.source || (data.exists ? 'Production File' : 'Not Configured'));
         } else {
           const text = await res.clone().text();
           if (text.includes('<!DOCTYPE html>') || text.includes('<html>') || text.includes('<html')) {
@@ -976,6 +978,15 @@ export const SettingsPage: React.FC = () => {
               <p className="text-xs text-gray-400 leading-relaxed font-sans">
                 Upload your Firebase Service Account JSON credentials to authorize secure, automated background administrative tasks like OTP Password Resets and player user account updates.
               </p>
+              
+              <div className="p-3 bg-purple-500/5 border border-purple-500/10 rounded-2xl text-[11px] text-gray-400 leading-normal font-sans space-y-1">
+                <span className="text-purple-400 font-bold flex items-center space-x-1">
+                  <span>💡 Pro Tip:</span>
+                </span>
+                <p>
+                  Instead of uploading files which can get deleted when the live server container restarts, you can configure the <code className="text-purple-300 font-mono px-1 bg-white/5 rounded border border-white/5">FIREBASE_SERVICE_ACCOUNT</code> environment variable with the full JSON content of your Service Account. The system will load it automatically from there for perfect stability!
+                </p>
+              </div>
 
               {/* Live Connection Status Banner */}
               <div className={`p-4 rounded-2xl border flex items-center justify-between ${
@@ -992,8 +1003,8 @@ export const SettingsPage: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono bg-white/5 border border-white/5 px-2 py-0.5 rounded text-gray-400">
-                  {saExists ? 'Production' : 'Manual Queue'}
+                <span className="text-[10px] font-mono bg-white/5 border border-white/5 px-2 py-0.5 rounded text-gray-400 text-right max-w-[200px] truncate">
+                  {saSource || (saExists ? 'Active' : 'Manual Queue')}
                 </span>
               </div>
 
