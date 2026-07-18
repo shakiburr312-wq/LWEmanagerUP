@@ -206,12 +206,13 @@ async function startServer() {
         return res.status(400).json({ error: "Email and OTP are required" });
       }
 
-      // Ensure Firebase Service Account is configured
+      // Ensure Firebase Service Account is configured (either file or env variable)
       const saPath = path.join(process.cwd(), "firebase-service-account.json");
-      if (!fs.existsSync(saPath)) {
-        console.warn("[SERVER] Firebase Admin service credentials file is missing.");
+      const hasSa = fs.existsSync(saPath) || !!process.env.FIREBASE_SERVICE_ACCOUNT;
+      if (!hasSa) {
+        console.warn("[SERVER] Firebase Admin service credentials (file and env var) are missing.");
         return res.status(500).json({
-          error: "The custom password reset system is currently unconfigured. Please contact an Administrator to upload the firebase-service-account.json file in the Admin Settings panel."
+          error: "The custom password reset system is currently unconfigured. Please contact an Administrator to configure the FIREBASE_SERVICE_ACCOUNT environment variable or upload the JSON file in the Admin Settings panel."
         });
       }
 
@@ -337,11 +338,12 @@ async function startServer() {
         return res.status(400).json({ error: "Email and OTP are required" });
       }
 
-      // Ensure Firebase Service Account is configured
+      // Ensure Firebase Service Account is configured (either file or env variable)
       const saPath = path.join(process.cwd(), "firebase-service-account.json");
-      if (!fs.existsSync(saPath)) {
+      const hasSa = fs.existsSync(saPath) || !!process.env.FIREBASE_SERVICE_ACCOUNT;
+      if (!hasSa) {
         return res.status(500).json({
-          error: "The custom password reset system is currently unconfigured. Please contact an Administrator to upload the firebase-service-account.json file in the Admin Settings panel."
+          error: "The custom password reset system is currently unconfigured. Please contact an Administrator to configure the FIREBASE_SERVICE_ACCOUNT environment variable or upload the JSON file in the Admin Settings panel."
         });
       }
 
