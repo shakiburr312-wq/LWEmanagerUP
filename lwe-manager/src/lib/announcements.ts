@@ -103,8 +103,8 @@ export async function addAnnouncement(ann: Omit<Announcement, 'id'>) {
         body: JSON.stringify(ann)
       });
       if (response.ok) {
-        const data = await response.json();
-        return data.id;
+        const data = await response.json().catch(() => ({}));
+        return data.id || mockId;
       }
       console.warn("Server API addAnnouncement failed, trying direct Firestore:", await response.text());
     } catch (e) {
