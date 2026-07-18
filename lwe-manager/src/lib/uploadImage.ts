@@ -22,8 +22,8 @@ export async function uploadImage(file: File, folder?: string): Promise<string> 
     throw new Error(errorData.error?.message || 'Failed to upload image to Cloudinary');
   }
 
-  const data = await response.json();
-  if (!data.secure_url) {
+  const data = await response.json().catch(() => ({}));
+  if (!data || !data.secure_url) {
     throw new Error('Cloudinary upload response did not contain secure_url');
   }
 
